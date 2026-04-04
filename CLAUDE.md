@@ -40,6 +40,11 @@ xcodebuild -project Yank.xcodeproj -scheme Yank -configuration Debug build
 xcodebuild -project Yank.xcodeproj -scheme Yank test
 ```
 
+### 注意事項
+
+- `xcodebuild` は Xcode.app（フル版）が必要。`xcode-select -p` が CommandLineTools を向いている場合は `sudo xcode-select --switch /Applications/Xcode-26.4.0.app/Contents/Developer` で切り替える。
+- `SupportingFiles/Info.plist` は xcodegen が自動生成する。`.gitignore` に含まれており手動作成不要。`Resources/` 内に置くと Copy Bundle Resources に重複コピーされるため `SupportingFiles/` に配置している。
+
 ## 前身プロジェクト (Clipy) からの参考実装
 
 本プロジェクトは [Clipy](https://github.com/Clipy/Clipy)（MIT License）の設計・実装を参考にしている。
