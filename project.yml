@@ -18,8 +18,8 @@ targets:
     platform: macOS
     sources:
       - path: Sources
-    resources:
       - path: Resources
+        buildPhase: resources
     info:
       path: SupportingFiles/Info.plist
       properties:
