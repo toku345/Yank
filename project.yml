@@ -1,0 +1,60 @@
+name: Yank
+options:
+  bundleIdPrefix: com.toku345
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  Yank:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      - path: Resources
+        buildPhase: resources
+    info:
+      path: SupportingFiles/Info.plist
+      properties:
+        CFBundleDisplayName: Yank
+        CFBundleName: Yank
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        NSAccessibilityUsageDescription: >-
+          Yank needs Accessibility access to simulate paste (Cmd+V)
+          after selecting a clipboard history item.
+        NSHumanReadableCopyright: "Copyright © 2026 toku345. All rights reserved."
+    entitlements:
+      path: SupportingFiles/Yank.entitlements
+      properties:
+        # CGEvent（ペースト実行）と Carbon API（グローバルホットキー）は Sandbox 内で動作しない
+        com.apple.security.app-sandbox: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.toku345.Yank
+        CODE_SIGN_ENTITLEMENTS: SupportingFiles/Yank.entitlements
+        ENABLE_HARDENED_RUNTIME: true
+    scheme:
+      testTargets:
+        - YankTests
+      gatherCoverageData: true
+
+  YankTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/YankTests
+    dependencies:
+      - target: Yank
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.toku345.YankTests

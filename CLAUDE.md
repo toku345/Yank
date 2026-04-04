@@ -40,12 +40,19 @@ xcodebuild -project Yank.xcodeproj -scheme Yank -configuration Debug build
 xcodebuild -project Yank.xcodeproj -scheme Yank test
 ```
 
+### 注意事項
+
+- `xcodebuild` は Xcode.app（フル版）が必要。`xcode-select -p` が CommandLineTools を向いている場合は `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer` で切り替える（パスは環境に合わせて調整）。
+- `SupportingFiles/Info.plist` は xcodegen が自動生成する。`.gitignore` に含まれており手動作成不要。`Resources/` 内に置くと Copy Bundle Resources に重複コピーされるため `SupportingFiles/` に配置している。
+- `SupportingFiles/Yank.entitlements` も同様に xcodegen が `project.yml` の `entitlements.properties` から自動生成する。`.gitignore` に含まれており、entitlements の変更は `project.yml` で行う。
+- XcodeGen でリソースを含めるには `sources` 内で `buildPhase: resources` を指定する。ターゲット直下の `resources` キーは公式スキーマに存在しない。
+
 ## 前身プロジェクト (Clipy) からの参考実装
 
 本プロジェクトは [Clipy](https://github.com/Clipy/Clipy)（MIT License）の設計・実装を参考にしている。
 コードを直接コピーする場合は Clipy の著作権表示を含めること。
 
-参考箇所（Clipyリポジトリ: `/Users/toku345/works/github/Clipy/`）：
+参考箇所（[Clipy リポジトリ](https://github.com/Clipy/Clipy)）：
 - クリップボード監視: `Clipy/Sources/Services/ClipService.swift:30-51`
 - ペースト実行: `Clipy/Sources/Services/PasteService.swift:142-165`
 - ホットキー登録: `Clipy/Sources/Services/HotKeyService.swift:112-120`
