@@ -52,7 +52,7 @@ xcodebuild -project Yank.xcodeproj -scheme Yank test
 本プロジェクトは [Clipy](https://github.com/Clipy/Clipy)（MIT License）の設計・実装を参考にしている。
 コードを直接コピーする場合は Clipy の著作権表示を含めること。
 
-参考箇所（Clipyリポジトリ: `/Users/toku345/works/github/Clipy/`）：
+参考箇所（[Clipy リポジトリ](https://github.com/Clipy/Clipy)）：
 - クリップボード監視: `Clipy/Sources/Services/ClipService.swift:30-51`
 - ペースト実行: `Clipy/Sources/Services/PasteService.swift:142-165`
 - ホットキー登録: `Clipy/Sources/Services/HotKeyService.swift:112-120`
