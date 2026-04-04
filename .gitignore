@@ -21,5 +21,8 @@ Package.resolved
 *.swp
 *~
 
+# Generated
+SupportingFiles/Info.plist
+
 # Misc
 *.log
