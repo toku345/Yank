@@ -58,3 +58,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.toku345.YankTests
+        GENERATE_INFOPLIST_FILE: true
