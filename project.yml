@@ -36,6 +36,7 @@ targets:
     entitlements:
       path: SupportingFiles/Yank.entitlements
       properties:
+        # CGEvent（ペースト実行）と Carbon API（グローバルホットキー）は Sandbox 内で動作しない
         com.apple.security.app-sandbox: false
     settings:
       base:

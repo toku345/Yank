@@ -23,6 +23,7 @@ Package.resolved
 
 # Generated
 SupportingFiles/Info.plist
+SupportingFiles/Yank.entitlements
 
 # Misc
 *.log
