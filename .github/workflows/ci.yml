@@ -14,11 +14,19 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Show environment
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -38,6 +46,7 @@ jobs:
         run: |
           xcodebuild -project Yank.xcodeproj \
             -scheme Yank \
+            -configuration Debug \
             -destination 'platform=macOS' \
             test
     timeout-minutes: 15
