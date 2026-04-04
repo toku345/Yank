@@ -40,8 +40,14 @@ xcodebuild -project Yank.xcodeproj -scheme Yank -configuration Debug build
 xcodebuild -project Yank.xcodeproj -scheme Yank test
 ```
 
+### CI
+
+- GitHub Actions（`macos-15` ランナー）で PR・main push 時にビルド・テストを実行。ワークフロー: `.github/workflows/ci.yml`
+- GitHub Actions のアクション参照は `pinact run` でコミットハッシュにピン留めする。
+
 ### 注意事項
 
+- テストターゲット（`YankTests`）には `project.yml` で `GENERATE_INFOPLIST_FILE: YES` が必要。未設定だと `xcodebuild test` が `Cannot code sign because the target does not have an Info.plist file` で失敗する。
 - `xcodebuild` は Xcode.app（フル版）が必要。`xcode-select -p` が CommandLineTools を向いている場合は `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer` で切り替える（パスは環境に合わせて調整）。
 - `SupportingFiles/Info.plist` は xcodegen が自動生成する。`.gitignore` に含まれており手動作成不要。`Resources/` 内に置くと Copy Bundle Resources に重複コピーされるため `SupportingFiles/` に配置している。
 - `SupportingFiles/Yank.entitlements` も同様に xcodegen が `project.yml` の `entitlements.properties` から自動生成する。`.gitignore` に含まれており、entitlements の変更は `project.yml` で行う。
