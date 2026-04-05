@@ -21,31 +21,26 @@ enum PasteEngine {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
+        let dataEntries: [(NSPasteboard.PasteboardType, Data?)] = [
+            (.rtf, item.rtfData),
+            (.rtfd, item.rtfdData),
+            (.pdf, item.pdfData),
+            (.tiff, item.tiffData)
+        ]
+
         var types: [NSPasteboard.PasteboardType] = []
         if item.stringValue != nil { types.append(.string) }
-        if item.rtfData != nil { types.append(.rtf) }
-        if item.rtfdData != nil { types.append(.rtfd) }
-        if item.pdfData != nil { types.append(.pdf) }
-        if item.tiffData != nil { types.append(.tiff) }
+        for (type, data) in dataEntries where data != nil { types.append(type) }
         if item.urlStrings != nil { types.append(.URL) }
         if item.fileURLs != nil { types.append(.fileURL) }
 
         pasteboard.declareTypes(types, owner: nil)
 
-        if let s = item.stringValue {
-            pasteboard.setString(s, forType: .string)
+        if let string = item.stringValue {
+            pasteboard.setString(string, forType: .string)
         }
-        if let d = item.rtfData {
-            pasteboard.setData(d, forType: .rtf)
-        }
-        if let d = item.rtfdData {
-            pasteboard.setData(d, forType: .rtfd)
-        }
-        if let d = item.pdfData {
-            pasteboard.setData(d, forType: .pdf)
-        }
-        if let d = item.tiffData {
-            pasteboard.setData(d, forType: .tiff)
+        for (type, data) in dataEntries {
+            if let data { pasteboard.setData(data, forType: type) }
         }
         if let urls = item.urlStrings, let first = urls.first {
             pasteboard.setString(first, forType: .URL)

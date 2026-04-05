@@ -66,9 +66,9 @@ struct ViewerContentView: View {
         guard !clipItems.isEmpty else { return }
         let current = selectedIndex ?? -1
         switch direction {
-        case .down:
+        case .moveDown:
             selectedIndex = min(current + 1, clipItems.count - 1)
-        case .up:
+        case .moveUp:
             selectedIndex = max(current - 1, 0)
         }
     }

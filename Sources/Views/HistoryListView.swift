@@ -44,12 +44,10 @@ private struct HistoryRow: View {
     }
 
     private func typeLabel(_ type: String) -> String {
-        switch type {
-        case let t where t.contains("rtf"): "RTF"
-        case let t where t.contains("pdf"): "PDF"
-        case let t where t.contains("tiff") || t.contains("png"): "Image"
-        case let t where t.contains("file-url"): "File"
-        default: "Other"
-        }
+        if type.contains("rtf") { return "RTF" }
+        if type.contains("pdf") { return "PDF" }
+        if type.contains("tiff") || type.contains("png") { return "Image" }
+        if type.contains("file-url") { return "File" }
+        return "Other"
     }
 }

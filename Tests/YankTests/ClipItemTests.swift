@@ -38,7 +38,7 @@ final class ClipItemTests: XCTestCase {
         let container = try makeContainer()
         let context = ModelContext(container)
 
-        let rtfData = "rtf content".data(using: .utf8)!
+        let rtfData = Data("rtf content".utf8)
         let item = ClipItem(
             title: "Rich text",
             primaryType: "public.rtf",
