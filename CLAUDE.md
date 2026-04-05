@@ -46,6 +46,23 @@ xcodebuild -project Yank.xcodeproj -scheme Yank test
 - `SupportingFiles/Info.plist` は xcodegen が自動生成する。`.gitignore` に含まれており手動作成不要。`Resources/` 内に置くと Copy Bundle Resources に重複コピーされるため `SupportingFiles/` に配置している。
 - `SupportingFiles/Yank.entitlements` も同様に xcodegen が `project.yml` の `entitlements.properties` から自動生成する。`.gitignore` に含まれており、entitlements の変更は `project.yml` で行う。
 - XcodeGen でリソースを含めるには `sources` 内で `buildPhase: resources` を指定する。ターゲット直下の `resources` キーは公式スキーマに存在しない。
+- YankTests ターゲットには `GENERATE_INFOPLIST_FILE: true` が必要（`project.yml` に設定済み）。
+
+### 手動テスト
+
+```bash
+# ビルド成果物のパスはプロジェクトディレクトリに紐づく（同じディレクトリなら不変）
+killall Yank 2>/dev/null
+open ~/Library/Developer/Xcode/DerivedData/Yank-cyrjxgwalxvjrtclicspdfexvkrl/Build/Products/Debug/Yank.app
+
+# ログ確認
+log stream --predicate 'subsystem == "com.toku345.Yank"' --level debug
+```
+
+### macOS 26 (Tahoe) 固有の注意
+
+- **Accessibility 権限のリセット**: ビルドのたびにバイナリが変わると権限が無効化され、CGEvent.post が黙って失敗する。ペーストが効かない場合、システム設定 → アクセシビリティから Yank を削除→再追加する。
+- **CGEvent Cmd+V シミュレーション**: `.hidSystemState` + `.cghidEventTap` では動作しない。`CGEventSource(.combinedSessionState)` + `setLocalEventsFilterDuringSuppressionState` + NX_NONCOALESCED フラグ (0x000008) + `.cgSessionEventTap` の組み合わせが必要（Maccy 方式）。
 
 ## 前身プロジェクト (Clipy) からの参考実装
 
