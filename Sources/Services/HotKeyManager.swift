@@ -20,7 +20,7 @@ final class HotKeyManager {
 
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
 
-        InstallEventHandler(
+        let installStatus = InstallEventHandler(
             GetApplicationEventTarget(),
             hotKeyCallback,
             1,
@@ -28,6 +28,10 @@ final class HotKeyManager {
             selfPtr,
             &handlerRef
         )
+        guard installStatus == noErr else {
+            logger.error("Failed to install event handler: \(installStatus)")
+            return
+        }
 
         let status = RegisterEventHotKey(
             UInt32(kVK_ANSI_V),

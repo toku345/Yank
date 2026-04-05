@@ -41,8 +41,6 @@ final class ViewerPanelController {
     private let monitor: ClipboardMonitor
     private let keyboardState = KeyboardState()
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ViewerPanelController")
-    /// The app that was frontmost before showing the panel (paste target)
-    private var previousApp: NSRunningApplication?
 
     init(modelContext: ModelContext, monitor: ClipboardMonitor) {
         self.modelContext = modelContext
@@ -58,8 +56,6 @@ final class ViewerPanelController {
     }
 
     func show() {
-        previousApp = NSWorkspace.shared.frontmostApplication
-        logger.debug("Previous app: \(self.previousApp?.localizedName ?? "nil", privacy: .public)")
 
         if panel == nil {
             let contentView = ViewerContentView(

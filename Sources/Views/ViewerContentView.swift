@@ -22,8 +22,7 @@ struct ViewerContentView: View {
             } else {
                 HistoryListView(
                     items: clipItems,
-                    selectedIndex: $selectedIndex,
-                    onPaste: onPaste
+                    selectedIndex: $selectedIndex
                 )
             }
         }

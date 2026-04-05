@@ -6,34 +6,38 @@ import os.log
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "AppDelegate")
 
-    var modelContainer: ModelContainer!
-    var clipboardMonitor: ClipboardMonitor!
-    var hotKeyManager: HotKeyManager!
-    var panelController: ViewerPanelController!
+    private(set) var modelContainer: ModelContainer?
+    private(set) var clipboardMonitor: ClipboardMonitor?
+    private(set) var hotKeyManager: HotKeyManager?
+    private(set) var panelController: ViewerPanelController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let schema = Schema([ClipItem.self, Snippet.self, SnippetFolder.self])
         let config = ModelConfiguration("Yank", schema: schema)
 
+        let container: ModelContainer
         do {
-            modelContainer = try ModelContainer(for: schema, configurations: [config])
+            container = try ModelContainer(for: schema, configurations: [config])
         } catch {
             logger.error("Failed to create ModelContainer: \(error)")
             fatalError("Failed to create ModelContainer: \(error)")
         }
+        modelContainer = container
 
-        let context = ModelContext(modelContainer)
+        let context = ModelContext(container)
 
-        clipboardMonitor = ClipboardMonitor(modelContext: context)
-        clipboardMonitor.start()
+        let monitor = ClipboardMonitor(modelContext: context)
+        monitor.start()
+        clipboardMonitor = monitor
 
-        panelController = ViewerPanelController(modelContext: context, monitor: clipboardMonitor)
+        panelController = ViewerPanelController(modelContext: context, monitor: monitor)
 
-        hotKeyManager = HotKeyManager()
-        hotKeyManager.onToggle = { [weak self] in
-            self?.panelController.toggle()
+        let hotKey = HotKeyManager()
+        hotKey.onToggle = { [weak self] in
+            self?.panelController?.toggle()
         }
-        hotKeyManager.register()
+        hotKey.register()
+        hotKeyManager = hotKey
 
         logger.info("Yank initialized successfully")
     }

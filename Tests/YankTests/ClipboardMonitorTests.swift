@@ -45,11 +45,12 @@ final class ClipboardMonitorTests: XCTestCase {
         let monitor = ClipboardMonitor(modelContext: context)
         monitor.start()
 
-        // PasteEngine と同じ方式: 書き込み後に skipUntilChangeCount をセット
+        // Mirror PasteEngine pattern: block before write, update after
+        monitor.skipLock.withLock { $0 = Int.max }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString("self-pasted content", forType: .string)
-        monitor.skipUntilChangeCount = pasteboard.changeCount
+        monitor.skipLock.withLock { $0 = pasteboard.changeCount }
 
         let expectation = expectation(description: "wait for poll")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

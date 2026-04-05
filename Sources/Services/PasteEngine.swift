@@ -16,7 +16,7 @@ enum PasteEngine {
 
     static func writeToPasteboard(item: ClipItem, monitor: ClipboardMonitor) {
         // Block monitor from detecting changeCount changes during our write
-        monitor.skipUntilChangeCount = Int.max
+        monitor.skipLock.withLock { $0 = Int.max }
 
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -50,7 +50,7 @@ enum PasteEngine {
         }
 
         // Update to actual changeCount so monitor skips only our writes
-        monitor.skipUntilChangeCount = pasteboard.changeCount
+        monitor.skipLock.withLock { $0 = pasteboard.changeCount }
 
         logger.debug("Wrote to pasteboard: \(item.title, privacy: .public)")
     }

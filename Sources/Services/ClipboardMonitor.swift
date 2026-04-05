@@ -11,8 +11,9 @@ final class ClipboardMonitor {
     private let modelContext: ModelContext
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ClipboardMonitor")
 
-    /// Set by PasteEngine after writing; changeCount values up to this are ignored
-    nonisolated(unsafe) var skipUntilChangeCount: Int = 0
+    /// Thread-safe storage for self-paste suppression.
+    /// Set by PasteEngine before/after writing; changeCount values up to this are ignored.
+    let skipLock = OSAllocatedUnfairLock(initialState: 0)
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -31,7 +32,8 @@ final class ClipboardMonitor {
             self.lastChangeCount = current
 
             // Skip changeCount increments caused by PasteEngine writes
-            if current <= self.skipUntilChangeCount {
+            let skipValue = self.skipLock.withLock { $0 }
+            if current <= skipValue {
                 return
             }
 
@@ -97,7 +99,11 @@ final class ClipboardMonitor {
             urlStrings: urlStrings
         )
         modelContext.insert(item)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
+        }
 
         logger.debug("Captured clip: \(title, privacy: .public) (\(primaryType, privacy: .public))")
     }

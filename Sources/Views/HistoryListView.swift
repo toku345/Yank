@@ -1,10 +1,8 @@
 import SwiftUI
-import SwiftData
 
 struct HistoryListView: View {
     let items: [ClipItem]
     @Binding var selectedIndex: Int?
-    let onPaste: (ClipItem) -> Void
 
     var body: some View {
         List(selection: $selectedIndex) {
