@@ -45,7 +45,7 @@ targets:
         ENABLE_HARDENED_RUNTIME: true
     postCompileScripts:
       - script: |
-          if which swiftlint > /dev/null; then
+          if command -v swiftlint > /dev/null 2>&1; then
             swiftlint lint --strict --quiet
           else
             echo "error: SwiftLint not installed. Install with: brew install swiftlint"
