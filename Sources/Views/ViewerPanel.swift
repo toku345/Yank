@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import SwiftData
+import os.log
 
 final class ViewerPanel: NSPanel {
     let keyboardState: KeyboardState
@@ -39,6 +40,9 @@ final class ViewerPanelController {
     private let modelContext: ModelContext
     private let monitor: ClipboardMonitor
     private let keyboardState = KeyboardState()
+    private let logger = Logger(subsystem: "com.toku345.Yank", category: "ViewerPanelController")
+    /// パネル表示前にフォーカスがあったアプリ（ペースト先）
+    private var previousApp: NSRunningApplication?
 
     init(modelContext: ModelContext, monitor: ClipboardMonitor) {
         self.modelContext = modelContext
@@ -54,6 +58,9 @@ final class ViewerPanelController {
     }
 
     func show() {
+        previousApp = NSWorkspace.shared.frontmostApplication
+        logger.debug("Previous app: \(self.previousApp?.localizedName ?? "nil", privacy: .public)")
+
         if panel == nil {
             let contentView = ViewerContentView(
                 keyboardState: keyboardState,
@@ -72,12 +79,14 @@ final class ViewerPanelController {
 
     func close() {
         panel?.orderOut(nil)
+        // LSUIElement アプリを隠すことで確実にフォーカスを返す
+        NSApp.hide(nil)
+        logger.debug("Panel closed, app hidden")
     }
 
     private func pasteAndClose(_ item: ClipItem) {
         close()
-        // パネルを閉じた後、前面アプリにフォーカスが戻る待ち時間
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             guard let self else { return }
             PasteEngine.paste(item: item, monitor: self.monitor)
         }

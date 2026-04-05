@@ -45,11 +45,11 @@ final class ClipboardMonitorTests: XCTestCase {
         let monitor = ClipboardMonitor(modelContext: context)
         monitor.start()
 
-        // self-paste フラグを立ててからペーストボードに書き込み
-        monitor.ignoringNextChange = true
+        // PasteEngine と同じ方式: 書き込み後に skipUntilChangeCount をセット
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString("self-pasted content", forType: .string)
+        monitor.skipUntilChangeCount = pasteboard.changeCount
 
         let expectation = expectation(description: "wait for poll")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

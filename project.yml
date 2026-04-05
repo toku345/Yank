@@ -32,12 +32,16 @@ targets:
         NSAccessibilityUsageDescription: >-
           Yank needs Accessibility access to simulate paste (Cmd+V)
           after selecting a clipboard history item.
+        NSAppleEventsUsageDescription: >-
+          Yank needs to send Apple Events to simulate paste (Cmd+V)
+          via System Events.
         NSHumanReadableCopyright: "Copyright © 2026 toku345. All rights reserved."
     entitlements:
       path: SupportingFiles/Yank.entitlements
       properties:
         # CGEvent（ペースト実行）と Carbon API（グローバルホットキー）は Sandbox 内で動作しない
         com.apple.security.app-sandbox: false
+        com.apple.security.automation.apple-events: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.toku345.Yank

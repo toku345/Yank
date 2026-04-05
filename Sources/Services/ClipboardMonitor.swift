@@ -11,8 +11,8 @@ final class ClipboardMonitor {
     private let modelContext: ModelContext
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ClipboardMonitor")
 
-    /// PasteEngine がペーストボードに書き込む前に true にし、自分起因の変更を無視する
-    nonisolated(unsafe) var ignoringNextChange: Bool = false
+    /// PasteEngine が書き込み後にセットする。この値以下の changeCount は無視する
+    nonisolated(unsafe) var skipUntilChangeCount: Int = 0
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -23,7 +23,6 @@ final class ClipboardMonitor {
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(1))
 
-        // changeCount はスレッドセーフに読める。変更検知時のみ MainActor にディスパッチ
         let pasteboard = self.pasteboard
         timer.setEventHandler { [weak self] in
             guard let self else { return }
@@ -31,8 +30,8 @@ final class ClipboardMonitor {
             guard current != self.lastChangeCount else { return }
             self.lastChangeCount = current
 
-            if self.ignoringNextChange {
-                self.ignoringNextChange = false
+            // PasteEngine による書き込み分を丸ごとスキップ
+            if current <= self.skipUntilChangeCount {
                 return
             }
 
@@ -51,6 +50,8 @@ final class ClipboardMonitor {
         logger.info("Stopped clipboard monitoring")
     }
 
+    private var lastCapturedString: String?
+
     private func captureClipboard() {
         guard let types = pasteboard.types, !types.isEmpty else { return }
 
@@ -58,6 +59,12 @@ final class ClipboardMonitor {
         let primaryType = availableTypes[0]
 
         let stringValue = pasteboard.string(forType: .string)
+
+        // 直前と同じ内容の重複キャプチャを防止
+        if let text = stringValue, text == lastCapturedString {
+            return
+        }
+        lastCapturedString = stringValue
         let rtfData = pasteboard.data(forType: .rtf)
         let rtfdData = pasteboard.data(forType: .rtfd)
         let pdfData = pasteboard.data(forType: .pdf)

@@ -15,8 +15,6 @@ enum PasteEngine {
     }
 
     static func writeToPasteboard(item: ClipItem, monitor: ClipboardMonitor) {
-        monitor.ignoringNextChange = true
-
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
@@ -53,11 +51,18 @@ enum PasteEngine {
             pasteboard.setString(first, forType: .fileURL)
         }
 
+        // 全書き込み完了後の changeCount をセットし、モニターにスキップさせる
+        monitor.skipUntilChangeCount = pasteboard.changeCount
+
         logger.debug("Wrote to pasteboard: \(item.title, privacy: .public)")
     }
 
     private static func simulateCmdV() {
-        let source = CGEventSource(stateID: .hidSystemState)
+        let source = CGEventSource(stateID: .combinedSessionState)
+        source?.setLocalEventsFilterDuringSuppressionState(
+            [.permitLocalMouseEvents, .permitSystemDefinedEvents],
+            state: .eventSuppressionStateSuppressionInterval
+        )
 
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
@@ -65,11 +70,13 @@ enum PasteEngine {
             return
         }
 
-        keyDown.flags = .maskCommand
-        keyUp.flags = .maskCommand
-        keyDown.post(tap: .cghidEventTap)
-        keyUp.post(tap: .cghidEventTap)
+        // 0x000008 = NX_NONCOALESCED: イベントがマージされて無視されるのを防ぐ
+        let cmdFlag = CGEventFlags(rawValue: CGEventFlags.maskCommand.rawValue | 0x000008)
+        keyDown.flags = cmdFlag
+        keyUp.flags = cmdFlag
+        keyDown.post(tap: .cgSessionEventTap)
+        keyUp.post(tap: .cgSessionEventTap)
 
-        logger.debug("Simulated Cmd+V")
+        logger.debug("Simulated Cmd+V via CGEvent")
     }
 }

@@ -58,3 +58,8 @@ xcodebuild -project Yank.xcodeproj -scheme Yank test
 - ホットキー登録: `Clipy/Sources/Services/HotKeyService.swift:112-120`
 - スニペットXML: `Clipy/Sources/Snippets/CPYSnippetsEditorWindowController.swift:154-254`
 - データモデル: `Clipy/Sources/Models/CPYClipData.swift`（型別データ保持の設計根拠）
+
+## 参考プロジェクト (Maccy)
+
+[Maccy](https://github.com/p0deje/Maccy)（MIT License）のペースト実装を参考にしている。
+CGEvent による Cmd+V シミュレーションの手法（`CGEventSource(.combinedSessionState)`, `setLocalEventsFilterDuringSuppressionState`, NX_NONCOALESCED フラグ, `.cgSessionEventTap`）を採用。
