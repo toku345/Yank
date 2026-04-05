@@ -11,7 +11,7 @@ final class ClipboardMonitor {
     private let modelContext: ModelContext
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ClipboardMonitor")
 
-    /// PasteEngine が書き込み後にセットする。この値以下の changeCount は無視する
+    /// Set by PasteEngine after writing; changeCount values up to this are ignored
     nonisolated(unsafe) var skipUntilChangeCount: Int = 0
 
     init(modelContext: ModelContext) {
@@ -30,7 +30,7 @@ final class ClipboardMonitor {
             guard current != self.lastChangeCount else { return }
             self.lastChangeCount = current
 
-            // PasteEngine による書き込み分を丸ごとスキップ
+            // Skip changeCount increments caused by PasteEngine writes
             if current <= self.skipUntilChangeCount {
                 return
             }
@@ -60,7 +60,7 @@ final class ClipboardMonitor {
 
         let stringValue = pasteboard.string(forType: .string)
 
-        // 直前と同じ内容の重複キャプチャを防止
+        // Deduplicate consecutive captures of the same text
         if let text = stringValue, text == lastCapturedString {
             return
         }

@@ -8,14 +8,14 @@ enum PasteEngine {
     static func paste(item: ClipItem, monitor: ClipboardMonitor) {
         writeToPasteboard(item: item, monitor: monitor)
 
-        // 前面アプリがフォーカスを取り戻す時間を確保してからペースト
+        // Allow the frontmost app to regain focus before simulating Cmd+V
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             simulateCmdV()
         }
     }
 
     static func writeToPasteboard(item: ClipItem, monitor: ClipboardMonitor) {
-        // 書き込み中の changeCount 変化をタイマーに検知させない
+        // Block monitor from detecting changeCount changes during our write
         monitor.skipUntilChangeCount = Int.max
 
         let pasteboard = NSPasteboard.general
@@ -49,7 +49,7 @@ enum PasteEngine {
             pasteboard.setString(first, forType: .fileURL)
         }
 
-        // 全書き込み完了後の changeCount をセットし、モニターにスキップさせる
+        // Update to actual changeCount so monitor skips only our writes
         monitor.skipUntilChangeCount = pasteboard.changeCount
 
         logger.debug("Wrote to pasteboard: \(item.title, privacy: .public)")
@@ -68,7 +68,7 @@ enum PasteEngine {
             return
         }
 
-        // 0x000008 = NX_NONCOALESCED: イベントがマージされて無視されるのを防ぐ
+        // 0x000008 = NX_NONCOALESCED: prevent event coalescing which silently drops keystrokes
         let cmdFlag = CGEventFlags(rawValue: CGEventFlags.maskCommand.rawValue | 0x000008)
         keyDown.flags = cmdFlag
         keyUp.flags = cmdFlag

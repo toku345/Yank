@@ -41,7 +41,7 @@ final class ViewerPanelController {
     private let monitor: ClipboardMonitor
     private let keyboardState = KeyboardState()
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ViewerPanelController")
-    /// パネル表示前にフォーカスがあったアプリ（ペースト先）
+    /// The app that was frontmost before showing the panel (paste target)
     private var previousApp: NSRunningApplication?
 
     init(modelContext: ModelContext, monitor: ClipboardMonitor) {
@@ -79,7 +79,7 @@ final class ViewerPanelController {
 
     func close() {
         panel?.orderOut(nil)
-        // LSUIElement アプリを隠すことで確実にフォーカスを返す
+        // Hiding an LSUIElement app reliably returns focus to the previous app
         NSApp.hide(nil)
         logger.debug("Panel closed, app hidden")
     }
