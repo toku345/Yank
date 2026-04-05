@@ -38,12 +38,16 @@ xcodebuild -project Yank.xcodeproj -scheme Yank -configuration Debug build
 
 # テスト
 xcodebuild -project Yank.xcodeproj -scheme Yank test
+
+# Lint
+swiftlint lint --strict
 ```
 
 ### CI
 
 - GitHub Actions（`macos-15` ランナー）で PR・main push 時にビルド・テストを実行。ワークフロー: `.github/workflows/ci.yml`
 - GitHub Actions のアクション参照は `pinact run` でコミットハッシュにピン留めする。
+- SwiftLint（Homebrew）で lint を実行。設定: `.swiftlint.yml`、ビルドフェーズ: `project.yml` の `postCompileScripts`。
 
 ### 注意事項
 

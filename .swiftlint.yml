@@ -1,0 +1,25 @@
+included:
+  - Sources
+  - Tests
+
+opt_in_rules:
+  - empty_count
+  - fatal_error_message
+  - modifier_order
+  - toggle_bool
+
+line_length:
+  warning: 120
+  error: 200
+  ignores_urls: true
+
+identifier_name:
+  min_length:
+    error: 1
+  excluded:
+    - id
+    - x
+    - y
+
+disabled_rules:
+  - todo
