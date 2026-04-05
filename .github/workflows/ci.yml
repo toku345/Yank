@@ -28,8 +28,11 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Install xcodegen
-        run: brew install xcodegen
+      - name: Install tools
+        run: brew install xcodegen swiftlint
+
+      - name: Lint
+        run: swiftlint lint --strict
 
       - name: Generate Xcode project
         run: xcodegen generate

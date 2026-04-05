@@ -43,6 +43,15 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.toku345.Yank
         CODE_SIGN_ENTITLEMENTS: SupportingFiles/Yank.entitlements
         ENABLE_HARDENED_RUNTIME: true
+    postCompileScripts:
+      - script: |
+          if which swiftlint > /dev/null; then
+            swiftlint lint --quiet
+          else
+            echo "warning: SwiftLint not installed. Install with: brew install swiftlint"
+          fi
+        name: SwiftLint
+        basedOnDependencyAnalysis: false
     scheme:
       testTargets:
         - YankTests
