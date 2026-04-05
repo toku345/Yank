@@ -46,9 +46,10 @@ targets:
     postCompileScripts:
       - script: |
           if which swiftlint > /dev/null; then
-            swiftlint lint --quiet
+            swiftlint lint --strict --quiet
           else
-            echo "warning: SwiftLint not installed. Install with: brew install swiftlint"
+            echo "error: SwiftLint not installed. Install with: brew install swiftlint"
+            exit 1
           fi
         name: SwiftLint
         basedOnDependencyAnalysis: false
