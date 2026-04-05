@@ -15,6 +15,9 @@ enum PasteEngine {
     }
 
     static func writeToPasteboard(item: ClipItem, monitor: ClipboardMonitor) {
+        // 書き込み中の changeCount 変化をタイマーに検知させない
+        monitor.skipUntilChangeCount = Int.max
+
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
