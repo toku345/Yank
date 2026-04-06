@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct YankApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
         MenuBarExtra("Yank", systemImage: "clipboard") {
             Button("About Yank") {
@@ -9,6 +11,7 @@ struct YankApp: App {
             }
             Divider()
             Button("Quit") {
+                appDelegate.coordinator.shutdown()
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
