@@ -1,13 +1,22 @@
 import Carbon
 import os.log
 
+enum HotKeyError: Error {
+    case installFailed(status: OSStatus)
+    case registrationFailed(status: OSStatus)
+}
+
 final class HotKeyManager {
-    private var hotKeyRef: EventHotKeyRef?
-    private var handlerRef: EventHandlerRef?
+    private var registration: (hotKey: EventHotKeyRef, handler: EventHandlerRef)?
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "HotKeyManager")
     var onToggle: (() -> Void)?
 
-    func register() {
+    func register() throws {
+        guard registration == nil else {
+            logger.warning("Hotkey already registered")
+            return
+        }
+
         let hotKeyID = EventHotKeyID(
             signature: fourCharCode("YnkH"),
             id: 1
@@ -18,51 +27,61 @@ final class HotKeyManager {
             eventKind: UInt32(kEventHotKeyPressed)
         )
 
-        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        let selfPtr = Unmanaged.passRetained(self).toOpaque()
 
+        var handler: EventHandlerRef?
         let installStatus = InstallEventHandler(
             GetApplicationEventTarget(),
             hotKeyCallback,
             1,
             &eventType,
             selfPtr,
-            &handlerRef
+            &handler
         )
         guard installStatus == noErr else {
-            logger.error("Failed to install event handler: \(installStatus)")
-            return
+            Unmanaged<HotKeyManager>.fromOpaque(selfPtr).release()
+            throw HotKeyError.installFailed(status: installStatus)
         }
 
-        let status = RegisterEventHotKey(
+        var hotKey: EventHotKeyRef?
+        let regStatus = RegisterEventHotKey(
             UInt32(kVK_ANSI_V),
             UInt32(cmdKey | shiftKey),
             hotKeyID,
             GetApplicationEventTarget(),
             0,
-            &hotKeyRef
+            &hotKey
         )
-
-        if status == noErr {
-            logger.info("Registered global hotkey Cmd+Shift+V")
-        } else {
-            logger.error("Failed to register hotkey: \(status)")
+        guard regStatus == noErr else {
+            RemoveEventHandler(handler!)
+            Unmanaged<HotKeyManager>.fromOpaque(selfPtr).release()
+            throw HotKeyError.registrationFailed(status: regStatus)
         }
+
+        registration = (hotKey: hotKey!, handler: handler!)
+        logger.info("Registered global hotkey Cmd+Shift+V")
     }
 
     func unregister() {
-        if let ref = hotKeyRef {
-            UnregisterEventHotKey(ref)
-            hotKeyRef = nil
-        }
-        if let ref = handlerRef {
-            RemoveEventHandler(ref)
-            handlerRef = nil
-        }
+        guard let reg = registration else { return }
+        UnregisterEventHotKey(reg.hotKey)
+        RemoveEventHandler(reg.handler)
+        Unmanaged<HotKeyManager>.passUnretained(self).release()
+        registration = nil
         logger.info("Unregistered global hotkey")
     }
 
     deinit {
-        unregister()
+        // unregister() releases the passRetained reference, so deinit only fires
+        // after unregister() is called (via applicationWillTerminate / shutdown).
+        // Guard against double-release: if registration is already nil, nothing to do.
+        if registration != nil {
+            // Defensive: should not reach here in normal flow
+            let reg = registration!
+            UnregisterEventHotKey(reg.hotKey)
+            RemoveEventHandler(reg.handler)
+            registration = nil
+        }
     }
 }
 

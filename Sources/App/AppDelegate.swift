@@ -36,14 +36,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKey.onToggle = { [weak self] in
             self?.panelController?.toggle()
         }
-        hotKey.register()
+        do {
+            try hotKey.register()
+        } catch {
+            logger.error("Hotkey registration failed: \(error)")
+            showHotKeyError(error)
+        }
         hotKeyManager = hotKey
 
         logger.info("Yank initialized successfully")
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        shutdown()
+    }
+
     func shutdown() {
         clipboardMonitor?.stop()
         hotKeyManager?.unregister()
+    }
+
+    private func showHotKeyError(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Failed to register hotkey"
+        alert.informativeText = "Cmd+Shift+V could not be registered: \(error)"
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 }
