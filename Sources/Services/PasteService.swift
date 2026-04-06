@@ -11,56 +11,45 @@ extension NSPasteboard.PasteboardType {
 enum PasteService {
     private static let logger = Logger(subsystem: "com.toku345.Yank", category: "PasteService")
 
-    /// Convenience: writes to pasteboard then simulates Cmd+V.
-    /// AppCoordinator may call writeToPasteboard/simulateCmdV separately
-    /// to insert a panel close between them (ADR 0003).
-    static func paste(item: ClipItem) {
-        writeToPasteboard(item: item)
-        simulateCmdV()
-    }
-
     static func writeToPasteboard(item: ClipItem) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
-        let dataEntries: [(NSPasteboard.PasteboardType, Data?)] = [
-            (.rtf, item.rtfData),
-            (.rtfd, item.rtfdData),
-            (.html, item.htmlData),
-            (.pdf, item.pdfData),
-            (.tiff, item.imageData)
-        ]
-
-        var types: [NSPasteboard.PasteboardType] = []
-        if item.stringValue != nil { types.append(.string) }
-        for (type, data) in dataEntries where data != nil { types.append(type) }
-        types.append(.fromYank)
-
-        pasteboard.declareTypes(types, owner: nil)
+        // Use NSPasteboardItem (modern API) exclusively.
+        // Apple SDK: "declareTypes should not be used with writeObjects"
+        let pbItem = NSPasteboardItem()
 
         if let string = item.stringValue {
-            pasteboard.setString(string, forType: .string)
+            pbItem.setString(string, forType: .string)
         }
-        for (type, data) in dataEntries {
-            if let data { pasteboard.setData(data, forType: type) }
-        }
+        if let data = item.rtfData { pbItem.setData(data, forType: .rtf) }
+        if let data = item.rtfdData { pbItem.setData(data, forType: .rtfd) }
+        if let data = item.htmlData { pbItem.setData(data, forType: .html) }
+        if let data = item.pdfData { pbItem.setData(data, forType: .pdf) }
+        if let data = item.imageData { pbItem.setData(data, forType: .tiff) }
 
-        // Restore file URLs (Finder multi-file copy uses one pasteboard item per URL)
+        // Self-paste suppression marker (ADR 0002)
+        pbItem.setString("", forType: .fromYank)
+
+        var objects: [NSPasteboardWriting] = [pbItem]
+
+        // Finder multi-file copy uses one pasteboard item per URL
         if let fileURLPaths = item.fileURLs, !fileURLPaths.isEmpty {
             let nsurls = fileURLPaths.compactMap { URL(string: $0) }.map { $0 as NSURL }
-            pasteboard.writeObjects(nsurls)
+            objects.append(contentsOf: nsurls)
         }
 
-        // Self-paste suppression marker
-        pasteboard.setString("", forType: .fromYank)
+        pasteboard.writeObjects(objects)
 
         logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
     }
 
-    static func simulateCmdV() {
+    /// Returns false if CGEvent creation fails (typically Accessibility permission missing).
+    @discardableResult
+    static func simulateCmdV() -> Bool {
         guard let source = CGEventSource(stateID: .combinedSessionState) else {
             logger.error("Failed to create CGEventSource -- check Accessibility permissions")
-            return
+            return false
         }
         source.setLocalEventsFilterDuringSuppressionState(
             [.permitLocalMouseEvents, .permitSystemDefinedEvents],
@@ -70,7 +59,7 @@ enum PasteService {
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
             logger.error("Failed to create CGEvent for Cmd+V")
-            return
+            return false
         }
 
         // NX_NONCOALESCED (0x000008): prevent event coalescing which silently drops keystrokes
@@ -81,5 +70,6 @@ enum PasteService {
         keyUp.post(tap: .cgSessionEventTap)
 
         logger.debug("Simulated Cmd+V via CGEvent")
+        return true
     }
 }

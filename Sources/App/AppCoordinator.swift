@@ -65,7 +65,9 @@ final class AppCoordinator {
     private func handlePaste(_ item: ClipItem) {
         PasteService.writeToPasteboard(item: item)
         panelController?.close()
-        PasteService.simulateCmdV()
+        if !PasteService.simulateCmdV() {
+            logger.error("Paste failed — Accessibility permission may not be granted")
+        }
     }
 
     private func checkAccessibility() {
