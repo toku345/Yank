@@ -1,15 +1,16 @@
+import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct HistoryListView: View {
     let items: [ClipItem]
-    @Binding var selectedIndex: Int?
+    @Binding var selectedID: PersistentIdentifier?
 
     var body: some View {
-        List(selection: $selectedIndex) {
-            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+        List(selection: $selectedID) {
+            ForEach(items) { item in
                 HistoryRow(item: item)
-                    .tag(index)
+                    .tag(item.persistentModelID)
             }
         }
         .listStyle(.plain)

@@ -1,12 +1,12 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct ViewerContentView: View {
     @Query(sort: \ClipItem.createdAt, order: .reverse)
     private var clipItems: [ClipItem]
 
     let viewerState: ViewerState
-    @State private var selectedIndex: Int?
+    @State private var selectedID: PersistentIdentifier?
 
     let onPaste: (ClipItem) -> Void
     let onClose: () -> Void
@@ -22,7 +22,7 @@ struct ViewerContentView: View {
             } else {
                 HistoryListView(
                     items: clipItems,
-                    selectedIndex: $selectedIndex
+                    selectedID: $selectedID
                 )
             }
         }
@@ -33,8 +33,8 @@ struct ViewerContentView: View {
             handleAction(action)
         }
         .onAppear {
-            if !clipItems.isEmpty && selectedIndex == nil {
-                selectedIndex = 0
+            if let first = clipItems.first, selectedID == nil {
+                selectedID = first.persistentModelID
             }
         }
     }
@@ -44,14 +44,14 @@ struct ViewerContentView: View {
         case .move(let direction):
             moveSelection(direction)
         case .jumpToStart:
-            guard !clipItems.isEmpty else { return }
-            selectedIndex = 0
+            guard let first = clipItems.first else { return }
+            selectedID = first.persistentModelID
         case .jumpToEnd:
-            guard !clipItems.isEmpty else { return }
-            selectedIndex = clipItems.count - 1
+            guard let last = clipItems.last else { return }
+            selectedID = last.persistentModelID
         case .paste:
-            if let idx = selectedIndex, idx < clipItems.count {
-                onPaste(clipItems[idx])
+            if let id = selectedID, let item = clipItems.first(where: { $0.persistentModelID == id }) {
+                onPaste(item)
             }
         case .close:
             onClose()
@@ -60,12 +60,16 @@ struct ViewerContentView: View {
 
     private func moveSelection(_ direction: ViewerAction.Direction) {
         guard !clipItems.isEmpty else { return }
-        let current = selectedIndex ?? -1
+        let currentIndex = selectedID.flatMap { id in
+            clipItems.firstIndex(where: { $0.persistentModelID == id })
+        } ?? -1
         switch direction {
         case .down:
-            selectedIndex = min(current + 1, clipItems.count - 1)
+            let newIndex = min(currentIndex + 1, clipItems.count - 1)
+            selectedID = clipItems[newIndex].persistentModelID
         case .up:
-            selectedIndex = max(current - 1, 0)
+            let newIndex = max(currentIndex - 1, 0)
+            selectedID = clipItems[newIndex].persistentModelID
         }
     }
 }
