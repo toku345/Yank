@@ -70,7 +70,7 @@ final class ViewerPanelController {
         }
         panel?.center()
         panel?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
     }
 
     func close() {
@@ -82,6 +82,7 @@ final class ViewerPanelController {
 
     private func pasteAndClose(_ item: ClipItem) {
         close()
+        // Wait for NSApp.hide to complete and the previous app to regain focus
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             guard let self else { return }
             PasteEngine.paste(item: item, monitor: self.monitor)

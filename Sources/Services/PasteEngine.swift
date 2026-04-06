@@ -17,6 +17,7 @@ enum PasteEngine {
     static func writeToPasteboard(item: ClipItem, monitor: ClipboardMonitor) {
         // Block monitor from detecting changeCount changes during our write
         monitor.skipLock.withLock { $0 = Int.max }
+        defer { monitor.skipLock.withLock { $0 = NSPasteboard.general.changeCount } }
 
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -25,6 +26,7 @@ enum PasteEngine {
             (.rtf, item.rtfData),
             (.rtfd, item.rtfdData),
             (.pdf, item.pdfData),
+            (.png, item.pngData),
             (.tiff, item.tiffData)
         ]
 
@@ -32,7 +34,6 @@ enum PasteEngine {
         if item.stringValue != nil { types.append(.string) }
         for (type, data) in dataEntries where data != nil { types.append(type) }
         if item.urlStrings != nil { types.append(.URL) }
-        if item.fileURLs != nil { types.append(.fileURL) }
 
         pasteboard.declareTypes(types, owner: nil)
 
@@ -45,19 +46,22 @@ enum PasteEngine {
         if let urls = item.urlStrings, let first = urls.first {
             pasteboard.setString(first, forType: .URL)
         }
-        if let urls = item.fileURLs, let first = urls.first {
-            pasteboard.setString(first, forType: .fileURL)
+
+        // Restore all file URLs (Finder multi-file copy uses one pasteboard item per URL)
+        if let fileURLPaths = item.fileURLs, !fileURLPaths.isEmpty {
+            let nsurls = fileURLPaths.compactMap { URL(string: $0) }.map { $0 as NSURL }
+            pasteboard.writeObjects(nsurls)
         }
 
-        // Update to actual changeCount so monitor skips only our writes
-        monitor.skipLock.withLock { $0 = pasteboard.changeCount }
-
-        logger.debug("Wrote to pasteboard: \(item.title, privacy: .public)")
+        logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
     }
 
     private static func simulateCmdV() {
-        let source = CGEventSource(stateID: .combinedSessionState)
-        source?.setLocalEventsFilterDuringSuppressionState(
+        guard let source = CGEventSource(stateID: .combinedSessionState) else {
+            logger.error("Failed to create CGEventSource -- check Accessibility permissions")
+            return
+        }
+        source.setLocalEventsFilterDuringSuppressionState(
             [.permitLocalMouseEvents, .permitSystemDefinedEvents],
             state: .eventSuppressionStateSuppressionInterval
         )
