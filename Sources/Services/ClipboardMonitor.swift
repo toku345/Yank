@@ -6,13 +6,13 @@ import os.log
 final class ClipboardMonitor {
     private let pasteboard = NSPasteboard.general
     private var lastChangeCount: Int
-    private var timer: DispatchSourceTimer?
-    private let queue = DispatchQueue(label: "com.toku345.Yank.clipboardMonitor", qos: .userInteractive)
+    private var timer: Timer?
     private let modelContext: ModelContext
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ClipboardMonitor")
 
     /// Thread-safe storage for self-paste suppression.
-    /// Set by PasteEngine before/after writing; changeCount values up to this are ignored.
+    /// PasteEngine sets this to Int.max before writing and updates it to the actual
+    /// changeCount after writing. The monitor ignores any changeCount <= this value.
     let skipLock = OSAllocatedUnfairLock(initialState: 0)
 
     init(modelContext: ModelContext) {
@@ -21,38 +21,33 @@ final class ClipboardMonitor {
     }
 
     func start() {
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: .milliseconds(1))
-
-        let pasteboard = self.pasteboard
-        timer.setEventHandler { [weak self] in
-            guard let self else { return }
-            let current = pasteboard.changeCount
-            guard current != self.lastChangeCount else { return }
-            self.lastChangeCount = current
-
-            // Skip changeCount increments caused by PasteEngine writes
-            let skipValue = self.skipLock.withLock { $0 }
-            if current <= skipValue {
-                return
-            }
-
-            Task { @MainActor [weak self] in
-                self?.captureClipboard()
-            }
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pollClipboard() }
         }
-        timer.resume()
+        RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
         logger.info("Started clipboard monitoring")
     }
 
     func stop() {
-        timer?.cancel()
+        timer?.invalidate()
         timer = nil
         logger.info("Stopped clipboard monitoring")
     }
 
+    private func pollClipboard() {
+        let current = pasteboard.changeCount
+        guard current != lastChangeCount else { return }
+        lastChangeCount = current
+
+        let skipValue = skipLock.withLock { $0 }
+        if current <= skipValue { return }
+
+        captureClipboard()
+    }
+
     private var lastCapturedString: String?
+    private var lastCapturedType: String?
 
     private func captureClipboard() {
         guard let types = pasteboard.types, !types.isEmpty else { return }
@@ -62,14 +57,17 @@ final class ClipboardMonitor {
 
         let stringValue = pasteboard.string(forType: .string)
 
-        // Deduplicate consecutive captures of the same text
-        if let text = stringValue, text == lastCapturedString {
+        // Deduplicate consecutive captures of the same content
+        if let text = stringValue, text == lastCapturedString, primaryType == lastCapturedType {
             return
         }
         lastCapturedString = stringValue
+        lastCapturedType = primaryType
+
         let rtfData = pasteboard.data(forType: .rtf)
         let rtfdData = pasteboard.data(forType: .rtfd)
         let pdfData = pasteboard.data(forType: .pdf)
+        let pngData = pasteboard.data(forType: .png)
         let tiffData = pasteboard.data(forType: .tiff)
 
         let fileURLs: [String]? = if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] {
@@ -94,6 +92,7 @@ final class ClipboardMonitor {
             rtfData: rtfData,
             rtfdData: rtfdData,
             pdfData: pdfData,
+            pngData: pngData,
             tiffData: tiffData,
             fileURLs: fileURLs,
             urlStrings: urlStrings
@@ -102,13 +101,14 @@ final class ClipboardMonitor {
         do {
             try modelContext.save()
         } catch {
+            modelContext.delete(item)
             logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
         }
 
-        logger.debug("Captured clip: \(title, privacy: .public) (\(primaryType, privacy: .public))")
+        logger.debug("Captured clip: \(title, privacy: .private) (\(primaryType, privacy: .public))")
     }
 
-    private static func deriveTitle(stringValue: String?, primaryType: String, fileURLs: [String]?) -> String {
+    static func deriveTitle(stringValue: String?, primaryType: String, fileURLs: [String]?) -> String {
         if let text = stringValue, !text.isEmpty {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             return String(trimmed.prefix(50))

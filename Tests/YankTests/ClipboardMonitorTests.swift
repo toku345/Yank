@@ -18,14 +18,14 @@ final class ClipboardMonitorTests: XCTestCase {
         let monitor = ClipboardMonitor(modelContext: context)
         monitor.start()
 
-        // テスト用に実ペーストボードに書き込み
+        // Write to actual pasteboard for testing
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString("test capture", forType: .string)
 
-        // ポーリング間隔 + MainActor ディスパッチの待ち時間
+        // Allow time for polling interval + MainActor dispatch
         let expectation = expectation(description: "clip captured")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             expectation.fulfill()
         }
         wait(for: [expectation], timeout: 1.0)
@@ -53,7 +53,7 @@ final class ClipboardMonitorTests: XCTestCase {
         monitor.skipLock.withLock { $0 = pasteboard.changeCount }
 
         let expectation = expectation(description: "wait for poll")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             expectation.fulfill()
         }
         wait(for: [expectation], timeout: 1.0)

@@ -10,6 +10,7 @@ final class ClipItem {
     var rtfData: Data?
     var rtfdData: Data?
     var pdfData: Data?
+    var pngData: Data?
     var tiffData: Data?
     var fileURLs: [String]?
     var urlStrings: [String]?
@@ -25,6 +26,7 @@ final class ClipItem {
         rtfData: Data? = nil,
         rtfdData: Data? = nil,
         pdfData: Data? = nil,
+        pngData: Data? = nil,
         tiffData: Data? = nil,
         fileURLs: [String]? = nil,
         urlStrings: [String]? = nil,
@@ -39,6 +41,7 @@ final class ClipItem {
         self.rtfData = rtfData
         self.rtfdData = rtfdData
         self.pdfData = pdfData
+        self.pngData = pngData
         self.tiffData = tiffData
         self.fileURLs = fileURLs
         self.urlStrings = urlStrings
