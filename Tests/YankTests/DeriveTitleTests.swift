@@ -101,8 +101,7 @@ final class DeriveTitleTests: XCTestCase {
             primaryType: "public.tiff",
             fileURLs: nil
         )
-        // Whitespace-only text: not empty before trimming, so text branch is entered.
-        // After trimming, prefix(50) returns empty string.
-        XCTAssertEqual(title, "")
+        // Whitespace-only text falls through to type-based title
+        XCTAssertEqual(title, "[Image]")
     }
 }
