@@ -6,6 +6,7 @@ enum HotKeyError: Error {
     case registrationFailed(status: OSStatus)
 }
 
+@MainActor
 final class HotKeyManager {
     private var registration: (hotKey: EventHotKeyRef, handler: EventHandlerRef)?
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "HotKeyManager")
@@ -66,26 +67,25 @@ final class HotKeyManager {
 
     func unregister() {
         guard let reg = registration else { return }
-        UnregisterEventHotKey(reg.hotKey)
-        RemoveEventHandler(reg.handler)
+        let unregStatus = UnregisterEventHotKey(reg.hotKey)
+        if unregStatus != noErr {
+            logger.warning("UnregisterEventHotKey failed: \(unregStatus)")
+        }
+        let removeStatus = RemoveEventHandler(reg.handler)
+        if removeStatus != noErr {
+            logger.warning("RemoveEventHandler failed: \(removeStatus)")
+        }
         Unmanaged<HotKeyManager>.passUnretained(self).release()
         registration = nil
         logger.info("Unregistered global hotkey")
     }
 
-    deinit {
-        // unregister() releases the passRetained reference, so deinit only fires
-        // after unregister() is called (via applicationWillTerminate / shutdown).
-        // Guard against double-release: if registration is already nil, nothing to do.
-        if registration != nil {
-            let reg = registration!
-            UnregisterEventHotKey(reg.hotKey)
-            RemoveEventHandler(reg.handler)
-            registration = nil
-        }
-    }
+    // passRetained in register() prevents deallocation while registered.
+    // deinit only fires after unregister() has released the retain and set registration = nil.
+    deinit {}
 }
 
+// Carbon event handlers run on the main thread (application event target)
 private func hotKeyCallback(
     _: EventHandlerCallRef?,
     _: EventRef?,
@@ -93,7 +93,7 @@ private func hotKeyCallback(
 ) -> OSStatus {
     guard let userData else { return OSStatus(eventNotHandledErr) }
     let manager = Unmanaged<HotKeyManager>.fromOpaque(userData).takeUnretainedValue()
-    DispatchQueue.main.async {
+    MainActor.assumeIsolated {
         manager.onToggle?()
     }
     return noErr
