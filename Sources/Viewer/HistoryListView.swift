@@ -42,14 +42,18 @@ private struct HistoryRow: View {
         .padding(.vertical, 2)
     }
 
+    // Check all available types, not just primaryType.
+    // Browsers often put app-specific types first (e.g. org.chromium.web-custom-data),
+    // with public.html as a secondary type.
     private func typeLabel(for item: ClipItem) -> String? {
-        guard let uttype = item.primaryUTType else { return nil }
-        if uttype.conforms(to: .plainText) { return nil }
-        if uttype.conforms(to: .rtf) || uttype.conforms(to: .rtfd) { return "RTF" }
-        if uttype.conforms(to: .html) { return "HTML" }
-        if uttype.conforms(to: .pdf) { return "PDF" }
-        if uttype.conforms(to: .image) { return "Image" }
-        if uttype.conforms(to: .fileURL) { return "File" }
+        let uttypes = item.availableTypes.compactMap { UTType($0) }
+        if uttypes.isEmpty { return nil }
+        if uttypes.allSatisfy({ $0.conforms(to: .plainText) }) { return nil }
+        if uttypes.contains(where: { $0.conforms(to: .rtf) || $0.conforms(to: .rtfd) }) { return "RTF" }
+        if uttypes.contains(where: { $0.conforms(to: .html) }) { return "HTML" }
+        if uttypes.contains(where: { $0.conforms(to: .pdf) }) { return "PDF" }
+        if uttypes.contains(where: { $0.conforms(to: .image) }) { return "Image" }
+        if uttypes.contains(where: { $0.conforms(to: .fileURL) }) { return "File" }
         return nil
     }
 }
