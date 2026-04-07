@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR 0001 introduced `ViewerState` with a single `pendingAction: ViewerAction?` property as a bridge between AppKit (`ViewerPanel.keyDown`) and SwiftUI (`ViewerContentView.onChange`). This consolidated 5 boolean flags into 1 discriminated union and was a significant improvement.
+ADR 0001 introduced `ViewerState` with a single `pendingAction: ViewerAction?` property as a bridge between AppKit (`ViewerPanel.sendEvent`) and SwiftUI (`ViewerContentView.onChange`). This consolidated 5 boolean flags into 1 discriminated union and was a significant improvement.
 
 However, `pendingAction` uses `@Observable` — a **state** observation mechanism — to convey **events** (discrete occurrences). This works for single key presses but fails during key repeat:
 
@@ -20,7 +20,7 @@ This causes C-n/C-p to stutter during key repeat (Issue #6). Observed symptoms i
 - Key repeat producing fewer moves than expected (events silently swallowed)
 - Rare oscillation where C-p causes the cursor to bounce between two adjacent items — likely a conflict between the programmatic `selectedID` update and the List's internal selection state propagating back through the two-way binding before the next `onChange` cycle
 
-Arrow keys are likely handled natively by the List's internal NSTableView before reaching `ViewerPanel.keyDown`, though this needs verification during implementation. If so, the arrow key cases in `EmacsKeyHandler.handlePlain` may be dead code.
+Arrow keys are intercepted by `ViewerPanel.sendEvent` before reaching the List's internal NSTableView, so the arrow key cases in `EmacsKeyHandler.handlePlain` are active and route through `ViewerState.perform()` like all other keybindings.
 
 ## Decision
 
@@ -32,16 +32,16 @@ Split `ViewerState` responsibilities by action type:
 `ViewerState` gains:
 - `selectedID: PersistentIdentifier?` — selection state, previously `@State` in `ViewerContentView`
 - `itemIDs: [PersistentIdentifier]` — ordered list of item IDs, synced from `ViewerContentView.onChange(of: clipItems)`
-- `perform(_ action: ViewerAction)` — single entry point called from `ViewerPanel.keyDown`
+- `perform(_ action: ViewerAction)` — single entry point called from `ViewerPanel.sendEvent`
 
 `EmacsKeyHandler` remains unchanged as a pure function.
 
-`ViewerContentView` passes a two-way `Binding` to `List(selection:)` via `Bindable(viewerState).selectedID`. The List's native selection handling (mouse clicks, arrow keys if they reach the List) also updates `selectedID` through this binding — selection state converges regardless of the input source.
+`ViewerContentView` passes a two-way `Binding` to `List(selection:)` via `$viewerState.selectedID` (using the `@Bindable` property wrapper). The List's native selection handling (mouse clicks) also updates `selectedID` through this binding — selection state converges regardless of the input source. Arrow keys do not reach the List because `sendEvent` intercepts them first.
 
 ## Consequences
 
 **Positive:**
-- Each `keyDown` event maps to exactly one selection change — no events lost during key repeat
+- Each key event maps to exactly one selection change — no events lost during key repeat
 - Selection logic is testable without SwiftUI view instantiation
 - `perform()` provides a natural extension point for Phase 2 keybindings (C-f/C-b tab switching)
 - `pendingAction` scope narrows to actions that genuinely need async View coordination
@@ -52,4 +52,4 @@ Split `ViewerState` responsibilities by action type:
 
 **Risks:**
 - If `itemIDs` sync drifts from the actual `@Query` result (e.g., a SwiftData insert occurs between syncs), selection could briefly reference a stale index. Mitigation: `moveSelection` guards against out-of-bounds via `min`/`max` clamping, and the next `onChange(of: clipItems)` resynchronizes immediately.
-- If arrow keys are handled natively by the List (hypothesis A in Context) and the `handlePlain` arrow key cases in `EmacsKeyHandler` remain, the same move action could fire twice (List native + `ViewerState.perform`). Verify during implementation and remove redundant cases if confirmed.
+- Arrow keys are intercepted by `sendEvent` and never reach the List's native handler, so duplicate move actions do not occur. If `sendEvent` logic changes in the future, verify that arrow key events are not handled by both `ViewerState.perform()` and the List's NSTableView.

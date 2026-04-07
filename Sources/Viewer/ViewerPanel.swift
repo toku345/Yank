@@ -75,10 +75,22 @@ final class ViewerPanelController {
             )
             panel = ViewerPanel(viewerState: viewerState, contentView: hostingView)
         }
+        // Sync itemIDs before setting selection so that the first show()
+        // (before SwiftUI's onAppear has fired) already has valid data.
+        syncItemIDs()
         viewerState.selectedID = viewerState.itemIDs.first
         panel?.center()
         panel?.makeKeyAndOrderFront(nil)
         NSApp.activate()
+    }
+
+    private func syncItemIDs() {
+        let context = ModelContext(modelContainer)
+        let descriptor = FetchDescriptor<ClipItem>(
+            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
+        )
+        guard let items = try? context.fetch(descriptor) else { return }
+        viewerState.itemIDs = items.map(\.persistentModelID)
     }
 
     func close() {

@@ -84,6 +84,25 @@ final class ViewerStateTests: XCTestCase {
         XCTAssertEqual(state.selectedID, ids[0])
     }
 
+    func testMoveUp_noSelection_selectsFirst() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = nil
+
+        state.perform(.move(.up))
+
+        XCTAssertEqual(state.selectedID, ids[0])
+    }
+
+    func testMoveUp_emptyItems_doesNothing() {
+        state.itemIDs = []
+        state.selectedID = nil
+
+        state.perform(.move(.up))
+
+        XCTAssertNil(state.selectedID)
+    }
+
     // MARK: - jumpToStart / jumpToEnd
 
     func testJumpToStart_selectsFirst() throws {
@@ -139,6 +158,14 @@ final class ViewerStateTests: XCTestCase {
         XCTAssertNil(state.selectedID)
     }
 
+    func testJumpToEnd_emptyItems_setsNil() {
+        state.itemIDs = []
+
+        state.perform(.jumpToEnd)
+
+        XCTAssertNil(state.selectedID)
+    }
+
     // MARK: - Key repeat simulation (Issue #6 core test)
 
     func testRapidMoveDown_advancesEveryStep() throws {
@@ -163,5 +190,17 @@ final class ViewerStateTests: XCTestCase {
         }
 
         XCTAssertEqual(state.selectedID, ids[2])
+    }
+
+    func testRapidMoveUp_advancesEveryStep() throws {
+        let ids = try makeItemIDs(count: 5)
+        state.itemIDs = ids
+        state.selectedID = ids[4]
+
+        for _ in 0..<4 {
+            state.perform(.move(.up))
+        }
+
+        XCTAssertEqual(state.selectedID, ids[0])
     }
 }
