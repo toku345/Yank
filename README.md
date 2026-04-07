@@ -1,6 +1,6 @@
 # Yank
 
-A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Clipy). Built with SwiftUI + SwiftData, zero external dependencies.
+A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Clipy). Built with SwiftUI + SwiftData, no runtime dependencies.
 
 ## Features
 
@@ -41,6 +41,8 @@ xcodebuild -project Yank.xcodeproj -scheme Yank -configuration Debug build
 
 # Launch the app
 open ~/Library/Developer/Xcode/DerivedData/Yank-*/Build/Products/Debug/Yank.app
+
+# Or run directly from Xcode: Product > Run (Cmd+R)
 ```
 
 On first launch, macOS will prompt for **Accessibility permission** (required for paste simulation via Cmd+V). Grant it in **System Settings > Privacy & Security > Accessibility**.
