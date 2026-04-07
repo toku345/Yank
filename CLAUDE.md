@@ -64,6 +64,10 @@ swiftlint lint --strict
 - **NSPasteboard API**: `declareTypes`/`setString`/`setData`（classic API）と `writeObjects`（modern API）を混用しない。Apple SDK: "declareTypes should not be used with writeObjects"。`NSPasteboardItem` + `writeObjects` で統一する。
 - **SwiftLint function_body_length**: デフォルト上限 50 行（コメント・空行除く）。関数にロジックを追加する際は超過に注意し、必要に応じてヘルパーに抽出する。
 - **Apple ドキュメント参照**: developer.apple.com は JavaScript 必須で WebFetch 不可。Xcode SDK ヘッダー（例: `find /Applications/Xcode*.app -name "NSPasteboard.h"`）にドキュメントコメントがあり、API 仕様の確認に使える。
+- **NSPanel でのキーイベント**: SwiftUI List を NSPanel 内で使う場合、List 内部の NSTableView がファーストレスポンダを奪うため `keyDown` に到達しないことがある。`sendEvent` をオーバーライドしてウィンドウレベルでインターセプトする。
+- **@Observable はイベントチャネルに使えない**: 同じ値の連続代入は `onChange` を発火しない。イベント的な通知には直接メソッド呼び出しか別の仕組みを使う。
+- **SwiftUI List のプログラム的スクロール**: `selection` binding の変更だけではスクロールしない。`ScrollViewReader` + `scrollTo` + `.id()` が必要。
+- **XCTestCase の setUp**: `setUp()` は non-throwing。throwing variant は `setUpWithError() throws`。`override func setUp() throws` はコンパイルエラーになる。
 
 ## ADR (Architecture Decision Records)
 
@@ -71,6 +75,7 @@ swiftlint lint --strict
 - ADR 0001: Coordinator + Action Enum アーキテクチャ
 - ADR 0002: 自己ペースト抑制にカスタム Pasteboard Type を採用
 - ADR 0003: ペーストフロー遅延除去と段階的検証方針
+- ADR 0004: ViewerState の直接セレクション変更（sendEvent + @Observable イベント問題）
 
 ## 前身プロジェクト (Clipy) からの参考実装
 
