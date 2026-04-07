@@ -14,6 +14,7 @@ final class ClipboardMonitorTests: XCTestCase {
         let context = try makeContext()
         let monitor = ClipboardMonitor(modelContext: context)
         monitor.start()
+        addTeardownBlock { monitor.stop() }
 
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -29,14 +30,13 @@ final class ClipboardMonitorTests: XCTestCase {
         let captured = items.first(where: { $0.stringValue == "test capture" })
         XCTAssertNotNil(captured)
         XCTAssertEqual(captured?.stringValue, "test capture")
-
-        monitor.stop()
     }
 
     func testIgnoresSelfPaste() throws {
         let context = try makeContext()
         let monitor = ClipboardMonitor(modelContext: context)
         monitor.start()
+        addTeardownBlock { monitor.stop() }
 
         // Simulate PasteService: write with .fromYank marker
         let pasteboard = NSPasteboard.general
@@ -54,7 +54,5 @@ final class ClipboardMonitorTests: XCTestCase {
         let items = try context.fetch(FetchDescriptor<ClipItem>())
         let selfPasted = items.first(where: { $0.stringValue == "self-pasted content" })
         XCTAssertNil(selfPasted, "Self-pasted content should not be captured")
-
-        monitor.stop()
     }
 }

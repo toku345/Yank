@@ -25,7 +25,7 @@ Adopt **Approach A: Coordinator + Action Enum** with the following changes:
 1. **AppCoordinator** — A dedicated `@MainActor` class owns component lifecycle and wiring. `AppDelegate` becomes a thin shell that delegates to the coordinator.
 
 2. **ViewerAction enum** — Replaces 5 boolean flags with a single discriminated union:
-   ```
+   ```swift
    enum ViewerAction: Equatable {
        case move(Direction), jumpToStart, jumpToEnd, paste, close
    }

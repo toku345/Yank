@@ -30,12 +30,12 @@ extension NSPasteboard.PasteboardType {
 ```
 
 **Write side (PasteService):** After writing all clipboard types, append `.fromYank` marker:
-```
+```swift
 pasteboard.setString("", forType: .fromYank)
 ```
 
 **Read side (ClipboardMonitor):** On changeCount change, check for marker presence:
-```
+```text
 if pasteboard items contain .fromYank → skip capture
 ```
 

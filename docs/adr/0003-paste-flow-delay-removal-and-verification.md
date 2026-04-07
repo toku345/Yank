@@ -22,7 +22,7 @@ Neither root cause was related to timing. The delays were artifacts of debugging
 Remove both hardcoded delays in the initial implementation and verify paste behavior through staged testing:
 
 **Stage 1: No delays (baseline)**
-```
+```text
 writeToPasteboard(item)  →  hide()  →  simulateCmdV()
 ```
 All three calls execute synchronously on the main thread.
@@ -30,7 +30,7 @@ All three calls execute synchronously on the main thread.
 **Stage 2: If paste fails to reach target app**
 
 Defer `simulateCmdV()` by one RunLoop cycle via `DispatchQueue.main.async`:
-```
+```swift
 writeToPasteboard(item)
 hide()                    // NSApp.hide(nil) — triggers focus return
 DispatchQueue.main.async {

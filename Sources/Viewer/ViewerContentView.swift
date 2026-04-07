@@ -37,6 +37,11 @@ struct ViewerContentView: View {
                 selectedID = first.persistentModelID
             }
         }
+        .onChange(of: clipItems.first?.persistentModelID) {
+            if selectedID == nil, let first = clipItems.first {
+                selectedID = first.persistentModelID
+            }
+        }
     }
 
     private func handleAction(_ action: ViewerAction) {
