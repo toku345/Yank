@@ -27,12 +27,16 @@ final class ViewerPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    override func keyDown(with event: NSEvent) {
-        if let action = EmacsKeyHandler.handle(event: event) {
+    // Intercept key events at the window level (before the responder
+    // chain), so they are handled even when an internal NSTableView
+    // inside the SwiftUI List holds first-responder status.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown,
+           let action = EmacsKeyHandler.handle(event: event) {
             viewerState.perform(action)
-        } else {
-            super.keyDown(with: event)
+            return
         }
+        super.sendEvent(event)
     }
 }
 

@@ -7,13 +7,21 @@ struct HistoryListView: View {
     @Binding var selectedID: PersistentIdentifier?
 
     var body: some View {
-        List(selection: $selectedID) {
-            ForEach(items) { item in
-                HistoryRow(item: item)
-                    .tag(item.persistentModelID)
+        ScrollViewReader { proxy in
+            List(selection: $selectedID) {
+                ForEach(items) { item in
+                    HistoryRow(item: item)
+                        .tag(item.persistentModelID)
+                        .id(item.persistentModelID)
+                }
+            }
+            .listStyle(.plain)
+            .onChange(of: selectedID) { _, newID in
+                if let id = newID {
+                    proxy.scrollTo(id)
+                }
             }
         }
-        .listStyle(.plain)
     }
 }
 
