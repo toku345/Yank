@@ -7,7 +7,7 @@ final class DeriveTitleTests: XCTestCase {
     func testTextContent_returnsTrimmedPrefix() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: "  Hello, World!  ",
-            primaryType: "public.utf8-plain-text",
+            availableTypes: ["public.utf8-plain-text"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "Hello, World!")
@@ -17,7 +17,7 @@ final class DeriveTitleTests: XCTestCase {
         let longText = String(repeating: "a", count: 100)
         let title = ClipboardMonitor.deriveTitle(
             stringValue: longText,
-            primaryType: "public.utf8-plain-text",
+            availableTypes: ["public.utf8-plain-text"],
             fileURLs: nil
         )
         XCTAssertEqual(title.count, 50)
@@ -26,7 +26,7 @@ final class DeriveTitleTests: XCTestCase {
     func testEmptyText_fallsThrough() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: "",
-            primaryType: "public.tiff",
+            availableTypes: ["public.tiff"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "[Image]")
@@ -35,7 +35,7 @@ final class DeriveTitleTests: XCTestCase {
     func testFileURL_returnsFileName() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: nil,
-            primaryType: "public.file-url",
+            availableTypes: ["public.file-url"],
             fileURLs: ["file:///Users/test/Documents/report.pdf"]
         )
         XCTAssertEqual(title, "[File: report.pdf]")
@@ -44,7 +44,7 @@ final class DeriveTitleTests: XCTestCase {
     func testTiffType_returnsImage() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: nil,
-            primaryType: "public.tiff",
+            availableTypes: ["public.tiff"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "[Image]")
@@ -53,7 +53,16 @@ final class DeriveTitleTests: XCTestCase {
     func testPngType_returnsImage() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: nil,
-            primaryType: "public.png",
+            availableTypes: ["public.png"],
+            fileURLs: nil
+        )
+        XCTAssertEqual(title, "[Image]")
+    }
+
+    func testPngType_withUnknownLeadingType_returnsImage() {
+        let title = ClipboardMonitor.deriveTitle(
+            stringValue: nil,
+            availableTypes: ["com.apple.unknown-internal-type", "public.png", "public.tiff"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "[Image]")
@@ -62,7 +71,7 @@ final class DeriveTitleTests: XCTestCase {
     func testPdfType_returnsPDF() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: nil,
-            primaryType: "com.adobe.pdf",
+            availableTypes: ["com.adobe.pdf"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "[PDF]")
@@ -71,7 +80,7 @@ final class DeriveTitleTests: XCTestCase {
     func testRtfType_returnsRTF() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: nil,
-            primaryType: "public.rtf",
+            availableTypes: ["public.rtf"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "[RTF]")
@@ -80,7 +89,7 @@ final class DeriveTitleTests: XCTestCase {
     func testHtmlType_returnsHTML() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: nil,
-            primaryType: "public.html",
+            availableTypes: ["public.html"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "[HTML]")
@@ -89,7 +98,7 @@ final class DeriveTitleTests: XCTestCase {
     func testUnknownType_returnsClipboardData() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: nil,
-            primaryType: "com.example.custom",
+            availableTypes: ["com.example.custom"],
             fileURLs: nil
         )
         XCTAssertEqual(title, "[Clipboard Data]")
@@ -98,7 +107,7 @@ final class DeriveTitleTests: XCTestCase {
     func testWhitespaceOnlyText_fallsThrough() {
         let title = ClipboardMonitor.deriveTitle(
             stringValue: "   \n\t  ",
-            primaryType: "public.tiff",
+            availableTypes: ["public.tiff"],
             fileURLs: nil
         )
         // Whitespace-only text falls through to type-based title
