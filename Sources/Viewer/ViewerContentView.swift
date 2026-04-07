@@ -21,7 +21,10 @@ struct ViewerContentView: View {
             } else {
                 HistoryListView(
                     items: clipItems,
-                    selectedID: $viewerState.selectedID
+                    selectedID: $viewerState.selectedID,
+                    onItemTap: { item in
+                        onPaste(item)
+                    }
                 )
             }
         }

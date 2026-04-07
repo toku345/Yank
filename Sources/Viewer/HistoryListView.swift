@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct HistoryListView: View {
     let items: [ClipItem]
     @Binding var selectedID: PersistentIdentifier?
+    var onItemTap: ((ClipItem) -> Void)?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -13,6 +14,10 @@ struct HistoryListView: View {
                     HistoryRow(item: item)
                         .tag(item.persistentModelID)
                         .id(item.persistentModelID)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onItemTap?(item)
+                        }
                 }
             }
             .listStyle(.plain)
