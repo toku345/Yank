@@ -15,6 +15,7 @@ line_length:
 
 identifier_name:
   min_length:
+    warning: 1
     error: 1
   excluded:
     - id
