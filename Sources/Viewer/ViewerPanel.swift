@@ -29,7 +29,7 @@ final class ViewerPanel: NSPanel {
 
     override func keyDown(with event: NSEvent) {
         if let action = EmacsKeyHandler.handle(event: event) {
-            viewerState.pendingAction = action
+            viewerState.perform(action)
         } else {
             super.keyDown(with: event)
         }
