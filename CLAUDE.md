@@ -59,6 +59,9 @@ swiftlint lint --strict
 - **Accessibility 権限リセット**: ビルド毎にバイナリが変わると macOS が Accessibility 権限を無効化する。CGEvent.post はエラーを返さず黙って失敗する。ペーストが効かない場合は「システム設定 → アクセシビリティ」から Yank を削除→再追加する。
 - **SwiftData ストアの場所**: `ModelConfiguration("Yank")` は `~/Library/Application Support/Yank.store` にファイルを作成する。スキーマ変更時は `rm -f ~/Library/Application\ Support/Yank.store*` で削除が必要。
 - **ワークツリー使用時のビルド成果物**: worktree ごとに DerivedData パスが異なる。手動テスト時は `open` にフルパスを指定する。
+- **NSPasteboard API**: `declareTypes`/`setString`/`setData`（classic API）と `writeObjects`（modern API）を混用しない。Apple SDK: "declareTypes should not be used with writeObjects"。`NSPasteboardItem` + `writeObjects` で統一する。
+- **SwiftLint function_body_length**: デフォルト上限 50 行（コメント・空行除く）。関数にロジックを追加する際は超過に注意し、必要に応じてヘルパーに抽出する。
+- **Apple ドキュメント参照**: developer.apple.com は JavaScript 必須で WebFetch 不可。Xcode SDK ヘッダー（例: `find /Applications/Xcode*.app -name "NSPasteboard.h"`）にドキュメントコメントがあり、API 仕様の確認に使える。
 
 ## ADR (Architecture Decision Records)
 
