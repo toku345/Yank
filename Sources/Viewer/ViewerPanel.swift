@@ -75,6 +75,7 @@ final class ViewerPanelController {
             )
             panel = ViewerPanel(viewerState: viewerState, contentView: hostingView)
         }
+        viewerState.selectedID = viewerState.itemIDs.first
         panel?.center()
         panel?.makeKeyAndOrderFront(nil)
         NSApp.activate()
