@@ -63,7 +63,10 @@ final class AppCoordinator {
 
     // ADR 0003 Stage 1: write → close → simulate (no delay)
     private func handlePaste(_ item: ClipItem) {
-        PasteService.writeToPasteboard(item: item)
+        guard PasteService.writeToPasteboard(item: item) else {
+            logger.error("Failed to write to pasteboard — aborting paste")
+            return
+        }
         panelController?.close()
         if !PasteService.simulateCmdV() {
             logger.error("Paste failed — Accessibility permission may not be granted")

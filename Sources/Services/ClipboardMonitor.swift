@@ -107,7 +107,6 @@ final class ClipboardMonitor {
         // Deduplicate consecutive captures using a fingerprint of all content
         let fingerprint = snapshot.fingerprint
         if fingerprint == lastCapturedFingerprint { return }
-        lastCapturedFingerprint = fingerprint
 
         let title = Self.deriveTitle(
             stringValue: snapshot.stringValue,
@@ -130,6 +129,7 @@ final class ClipboardMonitor {
         modelContext.insert(item)
         do {
             try modelContext.save()
+            lastCapturedFingerprint = fingerprint
         } catch {
             modelContext.delete(item)
             logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")

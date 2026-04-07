@@ -11,7 +11,8 @@ extension NSPasteboard.PasteboardType {
 enum PasteService {
     private static let logger = Logger(subsystem: "com.toku345.Yank", category: "PasteService")
 
-    static func writeToPasteboard(item: ClipItem) {
+    @discardableResult
+    static func writeToPasteboard(item: ClipItem) -> Bool {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
@@ -39,9 +40,13 @@ enum PasteService {
             objects.append(contentsOf: nsurls)
         }
 
-        pasteboard.writeObjects(objects)
-
-        logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
+        let success = pasteboard.writeObjects(objects)
+        if !success {
+            logger.error("writeObjects failed for: \(item.title, privacy: .private)")
+        } else {
+            logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
+        }
+        return success
     }
 
     /// Returns false if CGEvent creation fails (typically Accessibility permission missing).
