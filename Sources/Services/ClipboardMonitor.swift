@@ -72,7 +72,11 @@ final class ClipboardMonitor {
         guard let types = pasteboard.types, !types.isEmpty else { return nil }
 
         let availableTypes = types.map(\.rawValue)
-        let stringValue = pasteboard.string(forType: .string)
+        // Treat whitespace-only strings as nil — they have no user value
+        // and would show as "[Clipboard Data]" in the viewer.
+        let stringValue = pasteboard.string(forType: .string).flatMap { s in
+            s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : s
+        }
         let rtfData = pasteboard.data(forType: .rtf)
         let rtfdData = pasteboard.data(forType: .rtfd)
         let htmlData = pasteboard.data(forType: .html)
@@ -110,7 +114,7 @@ final class ClipboardMonitor {
 
         let title = Self.deriveTitle(
             stringValue: snapshot.stringValue,
-            primaryType: snapshot.primaryType,
+            availableTypes: snapshot.availableTypes,
             fileURLs: snapshot.fileURLs
         )
 
@@ -135,10 +139,12 @@ final class ClipboardMonitor {
             logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
         }
 
-        logger.debug("Captured clip: \(title, privacy: .private) (\(snapshot.primaryType, privacy: .public))")
+        logger.debug(
+            "Captured clip: \(title, privacy: .private) (\(snapshot.primaryType, privacy: .public))"
+        )
     }
 
-    static func deriveTitle(stringValue: String?, primaryType: String, fileURLs: [String]?) -> String {
+    static func deriveTitle(stringValue: String?, availableTypes: [String], fileURLs: [String]?) -> String {
         if let text = stringValue, !text.isEmpty {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
@@ -148,13 +154,15 @@ final class ClipboardMonitor {
         if let urls = fileURLs, let first = urls.first {
             return "[File: \(URL(string: first)?.lastPathComponent ?? first)]"
         }
-        if let uttype = UTType(primaryType) {
-            if uttype.conforms(to: .image) { return "[Image]" }
-            if uttype.conforms(to: .pdf) { return "[PDF]" }
-            if uttype.conforms(to: .rtfd) { return "[RTFD]" }
-            if uttype.conforms(to: .rtf) { return "[RTF]" }
-            if uttype.conforms(to: .html) { return "[HTML]" }
-        }
+        // Scan all available types, not just the first one.
+        // The pasteboard's leading type can be an Apple-internal identifier
+        // that UTType doesn't resolve, causing the check to miss known formats.
+        let uttypes = availableTypes.compactMap { UTType($0) }
+        if uttypes.contains(where: { $0.conforms(to: .image) }) { return "[Image]" }
+        if uttypes.contains(where: { $0.conforms(to: .pdf) }) { return "[PDF]" }
+        if uttypes.contains(where: { $0.conforms(to: .rtfd) }) { return "[RTFD]" }
+        if uttypes.contains(where: { $0.conforms(to: .rtf) }) { return "[RTF]" }
+        if uttypes.contains(where: { $0.conforms(to: .html) }) { return "[HTML]" }
         return "[Clipboard Data]"
     }
 }
