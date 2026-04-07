@@ -9,6 +9,9 @@ enum HotKeyError: Error {
 @MainActor
 final class HotKeyManager {
     private var registration: (hotKey: EventHotKeyRef, handler: EventHandlerRef)?
+    /// Raw pointer from passRetained(self), used as Carbon callback userData.
+    /// Stored to ensure unregister() releases the exact same reference.
+    private var retainedSelfPtr: UnsafeMutableRawPointer?
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "HotKeyManager")
     var onToggle: (() -> Void)?
 
@@ -28,8 +31,7 @@ final class HotKeyManager {
             eventKind: UInt32(kEventHotKeyPressed)
         )
 
-        // Carbon API callback requires a raw pointer to the manager instance.
-        // passRetained is balanced by release in unregister().
+        // passRetained adds +1 to RC. Balanced by fromOpaque(...).release() in unregister().
         let selfPtr = Unmanaged.passRetained(self).toOpaque()
 
         var handler: EventHandlerRef?
@@ -61,6 +63,7 @@ final class HotKeyManager {
             throw HotKeyError.registrationFailed(status: regStatus)
         }
 
+        retainedSelfPtr = selfPtr
         registration = (hotKey: hotKey!, handler: handler!)
         logger.info("Registered global hotkey Cmd+Shift+V")
     }
@@ -75,7 +78,9 @@ final class HotKeyManager {
         if removeStatus != noErr {
             logger.warning("RemoveEventHandler failed: \(removeStatus)")
         }
-        Unmanaged<HotKeyManager>.passUnretained(self).release()
+        // Release the +1 retain from passRetained in register()
+        Unmanaged<HotKeyManager>.fromOpaque(retainedSelfPtr!).release()
+        retainedSelfPtr = nil
         registration = nil
         logger.info("Unregistered global hotkey")
     }
