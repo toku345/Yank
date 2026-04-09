@@ -63,6 +63,11 @@ final class AppCoordinator {
 
     // ADR 0003 Stage 1: write → close → simulate (no delay)
     private func handlePaste(_ item: ClipItem) {
+        guard AXIsProcessTrusted() else {
+            logger.error("Accessibility permission not granted — aborting paste")
+            showAccessibilityError()
+            return
+        }
         guard PasteService.writeToPasteboard(item: item) else {
             logger.error("Failed to write to pasteboard — aborting paste")
             return
@@ -78,6 +83,18 @@ final class AppCoordinator {
         if !AXIsProcessTrustedWithOptions(options) {
             logger.warning("Accessibility permission not granted. Paste will not work.")
         }
+    }
+
+    private func showAccessibilityError() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility permission required"
+        alert.informativeText = """
+            Yank needs Accessibility permission to paste. \
+            Open System Settings > Privacy & Security > Accessibility, \
+            remove Yank, then re-add it.
+            """
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 
     private func showHotKeyError(_ error: Error) {
