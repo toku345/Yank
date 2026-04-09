@@ -63,18 +63,18 @@ final class AppCoordinator {
 
     // ADR 0003 Stage 1: write → close → simulate (no delay)
     private func handlePaste(_ item: ClipItem) {
-        guard AXIsProcessTrusted() else {
-            logger.error("Accessibility permission not granted — aborting paste")
-            showAccessibilityError()
-            return
-        }
         guard PasteService.writeToPasteboard(item: item) else {
             logger.error("Failed to write to pasteboard — aborting paste")
             return
         }
         panelController?.close()
+        guard AXIsProcessTrusted() else {
+            logger.error("Accessibility permission not granted — skipping synthetic paste")
+            showAccessibilityError()
+            return
+        }
         if !PasteService.simulateCmdV() {
-            logger.error("Paste failed — Accessibility permission may not be granted")
+            logger.error("Failed to simulate Cmd+V — CGEvent creation or posting failed")
         }
     }
 
@@ -89,9 +89,11 @@ final class AppCoordinator {
         let alert = NSAlert()
         alert.messageText = "Accessibility permission required"
         alert.informativeText = """
-            Yank needs Accessibility permission to paste. \
+            Yank needs Accessibility permission to paste automatically. \
             Open System Settings > Privacy & Security > Accessibility, \
-            remove Yank, then re-add it.
+            remove Yank, then re-add it. \
+            The selected item is on the clipboard — \
+            you can paste manually with Cmd+V.
             """
         alert.alertStyle = .warning
         alert.runModal()
