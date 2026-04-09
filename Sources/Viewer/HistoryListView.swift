@@ -35,14 +35,9 @@ private struct HistoryRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .lineLimit(1)
-                    .font(.body)
-                Text(item.createdAt, style: .relative)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(item.title)
+                .lineLimit(1)
+                .font(.body)
             Spacer()
             if let label = typeLabel(for: item) {
                 Text(label)
