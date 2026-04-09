@@ -42,6 +42,9 @@ xcodebuild -project Yank.xcodeproj -scheme Yank test
 
 # Lint
 swiftlint lint --strict
+
+# ログ監視（手動テスト時）
+log stream --predicate 'subsystem == "com.toku345.Yank"' --level debug
 ```
 
 ### CI
@@ -58,7 +61,7 @@ swiftlint lint --strict
 - `SupportingFiles/Info.plist` は xcodegen が自動生成する。`.gitignore` に含まれており手動作成不要。`Resources/` 内に置くと Copy Bundle Resources に重複コピーされるため `SupportingFiles/` に配置している。
 - `SupportingFiles/Yank.entitlements` も同様に xcodegen が `project.yml` の `entitlements.properties` から自動生成する。`.gitignore` に含まれており、entitlements の変更は `project.yml` で行う。
 - XcodeGen でリソースを含めるには `sources` 内で `buildPhase: resources` を指定する。ターゲット直下の `resources` キーは公式スキーマに存在しない。
-- **Accessibility 権限リセット**: ビルド毎にバイナリが変わると macOS が Accessibility 権限を無効化する。CGEvent.post はエラーを返さず黙って失敗する。ペーストが効かない場合は「システム設定 → アクセシビリティ」から Yank を削除→再追加する。
+- **Accessibility 権限リセット**: ビルド毎にバイナリが変わると macOS が Accessibility 権限を無効化する。システム設定 UI 上はチェックが入ったままだが `AXIsProcessTrusted()` は `false` を返す。CGEvent.post はエラーを返さず黙って失敗する。ペーストが効かない場合は「システム設定 → アクセシビリティ」から Yank を削除→再追加する。
 - **SwiftData ストアの場所**: `ModelConfiguration("Yank")` は `~/Library/Application Support/Yank.store` にファイルを作成する。スキーマ変更時は `rm -f ~/Library/Application\ Support/Yank.store*` で削除が必要。
 - **ワークツリー使用時のビルド成果物**: worktree ごとに DerivedData パスが異なる。手動テスト時は `open` にフルパスを指定する。
 - **NSPasteboard API**: `declareTypes`/`setString`/`setData`（classic API）と `writeObjects`（modern API）を混用しない。Apple SDK: "declareTypes should not be used with writeObjects"。`NSPasteboardItem` + `writeObjects` で統一する。
@@ -68,6 +71,7 @@ swiftlint lint --strict
 - **@Observable はイベントチャネルに使えない**: 同じ値の連続代入は `onChange` を発火しない。イベント的な通知には直接メソッド呼び出しか別の仕組みを使う。
 - **SwiftUI List のプログラム的スクロール**: `selection` binding の変更だけではスクロールしない。`ScrollViewReader` + `scrollTo` + `.id()` が必要。
 - **XCTestCase の setUp**: `setUp()` は non-throwing。throwing variant は `setUpWithError() throws`。`override func setUp() throws` はコンパイルエラーになる。
+- **LSUIElement と NSAlert**: `LSUIElement = true`（メニューバーアプリ）でも `NSAlert.runModal()` は前面に表示される。ユーザー向けエラー通知に使える。
 
 ## ADR (Architecture Decision Records)
 
