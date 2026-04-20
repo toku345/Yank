@@ -49,6 +49,37 @@ enum PasteService {
         return success
     }
 
+    @discardableResult
+    static func writePlainTextToPasteboard(item: ClipItem) -> Bool {
+        // Derive text BEFORE clearing the pasteboard to avoid data loss on failure
+        let textValue: String
+        if let string = item.stringValue {
+            textValue = string
+        } else if let fileURLPaths = item.fileURLs, !fileURLPaths.isEmpty {
+            textValue = fileURLPaths.compactMap { URL(string: $0)?.path }.joined(separator: "\n")
+        } else {
+            logger.warning("No text representation for plain-text paste: \(item.title, privacy: .private)")
+            return false
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        let pbItem = NSPasteboardItem()
+        pbItem.setString(textValue, forType: .string)
+
+        // Self-paste suppression marker (ADR 0002)
+        pbItem.setString("", forType: .fromYank)
+
+        let success = pasteboard.writeObjects([pbItem])
+        if !success {
+            logger.error("writePlainTextToPasteboard failed for: \(item.title, privacy: .private)")
+        } else {
+            logger.debug("Wrote plain text to pasteboard: \(item.title, privacy: .private)")
+        }
+        return success
+    }
+
     /// Returns false if CGEvent creation fails (typically Accessibility permission missing).
     @discardableResult
     static func simulateCmdV() -> Bool {

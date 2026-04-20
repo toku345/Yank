@@ -47,7 +47,7 @@ final class ViewerPanelController {
     private let viewerState: ViewerState
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ViewerPanelController")
 
-    var onPaste: ((ClipItem) -> Void)?
+    var onPaste: ((ClipItem, PasteFormat) -> Void)?
     var onClose: (() -> Void)?
 
     init(modelContainer: ModelContainer, viewerState: ViewerState) {
@@ -67,7 +67,7 @@ final class ViewerPanelController {
         if panel == nil {
             let contentView = ViewerContentView(
                 viewerState: viewerState,
-                onPaste: { [weak self] item in self?.onPaste?(item) },
+                onPaste: { [weak self] item, format in self?.onPaste?(item, format) },
                 onClose: { [weak self] in self?.onClose?() }
             )
             let hostingView = NSHostingView(

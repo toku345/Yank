@@ -33,9 +33,14 @@ final class EmacsKeyHandlerTests: XCTestCase {
 
     // MARK: - Plain key bindings
 
-    func testReturn_pastes() {
+    func testReturn_pastesOriginal() {
         let event = makeKeyEvent(keyCode: 36)
-        XCTAssertEqual(EmacsKeyHandler.handle(event: event), .paste)
+        XCTAssertEqual(EmacsKeyHandler.handle(event: event), .paste(.original))
+    }
+
+    func testControlReturn_pastesPlainText() {
+        let event = makeKeyEvent(keyCode: 36, modifierFlags: .control)
+        XCTAssertEqual(EmacsKeyHandler.handle(event: event), .paste(.plainText))
     }
 
     func testEscape_closes() {
@@ -82,11 +87,11 @@ final class EmacsKeyHandlerTests: XCTestCase {
         )!
     }
 
-    private func makeKeyEvent(keyCode: UInt16) -> NSEvent {
+    private func makeKeyEvent(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags = []) -> NSEvent {
         NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
-            modifierFlags: [],
+            modifierFlags: modifierFlags,
             timestamp: 0,
             windowNumber: 0,
             context: nil,
