@@ -53,6 +53,13 @@ final class PasteServiceTests: XCTestCase {
     }
 
     func testWritePlainText_withNoTextRepresentation_returnsFalse() throws {
+        // Seed a sentinel so we can verify the clipboard is not wiped on failure.
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let sentinel = NSPasteboardItem()
+        sentinel.setString("sentinel", forType: .string)
+        pasteboard.writeObjects([sentinel])
+
         let container = try makeContainer()
         let context = ModelContext(container)
 
@@ -68,5 +75,53 @@ final class PasteServiceTests: XCTestCase {
         let result = PasteService.writePlainTextToPasteboard(item: item)
 
         XCTAssertFalse(result)
+        XCTAssertEqual(pasteboard.string(forType: .string), "sentinel")
+    }
+
+    func testWritePlainText_withHTMLOnly_extractsPlainText() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let html = "<p>Hello, <b>world</b>!</p>"
+        let item = ClipItem(
+            title: "[HTML]",
+            primaryType: "public.html",
+            availableTypes: ["public.html"],
+            htmlData: Data(html.utf8)
+        )
+        context.insert(item)
+        try context.save()
+
+        let result = PasteService.writePlainTextToPasteboard(item: item)
+
+        XCTAssertTrue(result)
+        let pasteboard = NSPasteboard.general
+        let written = pasteboard.string(forType: .string) ?? ""
+        XCTAssertTrue(written.contains("Hello"))
+        XCTAssertTrue(written.contains("world"))
+        XCTAssertFalse(written.contains("<"))
+        XCTAssertNil(pasteboard.data(forType: .html))
+    }
+
+    func testWritePlainText_withRTFOnly_extractsPlainText() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let rtf = "{\\rtf1\\ansi Hello RTF}"
+        let item = ClipItem(
+            title: "[RTF]",
+            primaryType: "public.rtf",
+            availableTypes: ["public.rtf"],
+            rtfData: Data(rtf.utf8)
+        )
+        context.insert(item)
+        try context.save()
+
+        let result = PasteService.writePlainTextToPasteboard(item: item)
+
+        XCTAssertTrue(result)
+        let pasteboard = NSPasteboard.general
+        XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Hello RTF"))
+        XCTAssertNil(pasteboard.data(forType: .rtf))
     }
 }
