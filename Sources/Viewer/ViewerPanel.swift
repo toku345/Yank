@@ -5,6 +5,10 @@ import os.log
 
 final class ViewerPanel: NSPanel {
     let viewerState: ViewerState
+    /// Tracks modifier keys via flagsChanged events for reliable detection.
+    /// NSEvent.modifierFlags on keyDown carries stale state from prior
+    /// key combos (Cmd+Shift+V hotkey, Ctrl+N/P navigation).
+    private var trackedModifiers: NSEvent.ModifierFlags = []
 
     init(viewerState: ViewerState, contentView: NSView) {
         self.viewerState = viewerState
@@ -31,12 +35,22 @@ final class ViewerPanel: NSPanel {
     // chain), so they are handled even when an internal NSTableView
     // inside the SwiftUI List holds first-responder status.
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .flagsChanged {
+            trackedModifiers = event.modifierFlags
+                .intersection(.deviceIndependentFlagsMask)
+        }
         if event.type == .keyDown,
-           let action = EmacsKeyHandler.handle(event: event) {
+           let action = EmacsKeyHandler.handle(
+               event: event, trackedModifiers: trackedModifiers
+           ) {
             viewerState.perform(action)
             return
         }
         super.sendEvent(event)
+    }
+
+    func resetTrackedModifiers() {
+        trackedModifiers = []
     }
 }
 
@@ -47,7 +61,7 @@ final class ViewerPanelController {
     private let viewerState: ViewerState
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ViewerPanelController")
 
-    var onPaste: ((ClipItem) -> Void)?
+    var onPaste: ((ClipItem, PasteFormat) -> Void)?
     var onClose: (() -> Void)?
 
     init(modelContainer: ModelContainer, viewerState: ViewerState) {
@@ -67,7 +81,7 @@ final class ViewerPanelController {
         if panel == nil {
             let contentView = ViewerContentView(
                 viewerState: viewerState,
-                onPaste: { [weak self] item in self?.onPaste?(item) },
+                onPaste: { [weak self] item, format in self?.onPaste?(item, format) },
                 onClose: { [weak self] in self?.onClose?() }
             )
             let hostingView = NSHostingView(
@@ -79,6 +93,8 @@ final class ViewerPanelController {
         // (before SwiftUI's onAppear has fired) already has valid data.
         syncItemIDs()
         viewerState.selectedID = viewerState.itemIDs.first
+        // Clear stale modifier state from the Cmd+Shift+V hotkey
+        panel?.resetTrackedModifiers()
         panel?.center()
         panel?.makeKeyAndOrderFront(nil)
         NSApp.activate()

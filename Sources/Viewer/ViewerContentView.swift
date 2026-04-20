@@ -7,7 +7,7 @@ struct ViewerContentView: View {
 
     @Bindable var viewerState: ViewerState
 
-    let onPaste: (ClipItem) -> Void
+    let onPaste: (ClipItem, PasteFormat) -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -23,7 +23,7 @@ struct ViewerContentView: View {
                     items: clipItems,
                     selectedID: $viewerState.selectedID,
                     onItemTap: { item in
-                        onPaste(item)
+                        onPaste(item, .original)
                     }
                 )
             }
@@ -50,10 +50,10 @@ struct ViewerContentView: View {
 
     private func handleViewAction(_ action: ViewerAction) {
         switch action {
-        case .paste:
+        case .paste(let format):
             if let id = viewerState.selectedID,
                let item = clipItems.first(where: { $0.persistentModelID == id }) {
-                onPaste(item)
+                onPaste(item, format)
             }
         case .close:
             onClose()

@@ -37,7 +37,7 @@ final class AppCoordinator {
             modelContainer: container,
             viewerState: viewerState
         )
-        controller.onPaste = { [weak self] item in self?.handlePaste(item) }
+        controller.onPaste = { [weak self] item, format in self?.handlePaste(item, format: format) }
         controller.onClose = { [weak self] in self?.panelController?.close() }
         panelController = controller
 
@@ -62,8 +62,18 @@ final class AppCoordinator {
     }
 
     // ADR 0003 Stage 1: write → close → simulate (no delay)
-    private func handlePaste(_ item: ClipItem) {
-        guard PasteService.writeToPasteboard(item: item) else {
+    private func handlePaste(_ item: ClipItem, format: PasteFormat) {
+        let success: Bool
+        switch format {
+        case .original:
+            success = PasteService.writeToPasteboard(item: item)
+        case .plainText:
+            success = PasteService.writePlainTextToPasteboard(item: item)
+        }
+        guard success else {
+            // Plain-text paste can fail when the item has no text representation
+            // (e.g. image-only clips). Beep to signal the action didn't take.
+            NSSound.beep()
             logger.error("Failed to write to pasteboard — aborting paste")
             return
         }

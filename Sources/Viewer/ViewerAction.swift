@@ -1,6 +1,11 @@
 import Foundation
 import SwiftData
 
+enum PasteFormat {
+    case original
+    case plainText
+}
+
 enum ViewerAction: Equatable {
     enum Direction {
         case up, down
@@ -9,7 +14,7 @@ enum ViewerAction: Equatable {
     case move(Direction)
     case jumpToStart
     case jumpToEnd
-    case paste
+    case paste(PasteFormat)
     case close
 }
 

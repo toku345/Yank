@@ -13,9 +13,6 @@ enum PasteService {
 
     @discardableResult
     static func writeToPasteboard(item: ClipItem) -> Bool {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
         // Use NSPasteboardItem (modern API) exclusively.
         // Apple SDK: "declareTypes should not be used with writeObjects"
         let pbItem = NSPasteboardItem()
@@ -40,13 +37,93 @@ enum PasteService {
             objects.append(contentsOf: nsurls)
         }
 
-        let success = pasteboard.writeObjects(objects)
-        if !success {
-            logger.error("writeObjects failed for: \(item.title, privacy: .private)")
-        } else {
-            logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
+        guard writePreservingOnFailure(objects, to: .general) else {
+            logger.error("writeObjects failed; restored snapshot for: \(item.title, privacy: .private)")
+            return false
         }
-        return success
+        logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
+        return true
+    }
+
+    @discardableResult
+    static func writePlainTextToPasteboard(item: ClipItem) -> Bool {
+        // Derive text BEFORE touching the pasteboard so a validation failure
+        // leaves the user's existing clipboard intact.
+        guard let textValue = derivePlainText(from: item) else {
+            logger.warning("No text representation for plain-text paste: \(item.title, privacy: .private)")
+            return false
+        }
+
+        let pbItem = NSPasteboardItem()
+        pbItem.setString(textValue, forType: .string)
+        // Self-paste suppression marker (ADR 0002)
+        pbItem.setString("", forType: .fromYank)
+
+        guard writePreservingOnFailure([pbItem], to: .general) else {
+            logger.error("writePlainTextToPasteboard failed; restored snapshot for: \(item.title, privacy: .private)")
+            return false
+        }
+        logger.debug("Wrote plain text to pasteboard: \(item.title, privacy: .private)")
+        return true
+    }
+
+    /// Snapshots the pasteboard, clears it, writes `objects`, and restores
+    /// the snapshot on failure. Protects the user's clipboard against the
+    /// rare case where writeObjects returns false after clearContents.
+    private static func writePreservingOnFailure(
+        _ objects: [NSPasteboardWriting],
+        to pasteboard: NSPasteboard
+    ) -> Bool {
+        let snapshot = snapshotPasteboardItems(pasteboard)
+        pasteboard.clearContents()
+        if pasteboard.writeObjects(objects) { return true }
+        pasteboard.clearContents()
+        if !snapshot.isEmpty, !pasteboard.writeObjects(snapshot) {
+            logger.warning("Failed to restore pasteboard snapshot; user clipboard may be empty")
+        }
+        return false
+    }
+
+    private static func derivePlainText(from item: ClipItem) -> String? {
+        if let string = item.stringValue { return string }
+        if let urls = item.fileURLs, !urls.isEmpty {
+            let joined = urls.compactMap { URL(string: $0)?.path }.joined(separator: "\n")
+            return joined.isEmpty ? nil : joined
+        }
+        // Fallback for rich-text-only clips (HTML/RTF/RTFD without a .string twin)
+        return extractRichText(from: item)
+    }
+
+    private static func extractRichText(from item: ClipItem) -> String? {
+        let candidates: [(Data?, NSAttributedString.DocumentType)] = [
+            (item.htmlData, .html),
+            (item.rtfData, .rtf),
+            (item.rtfdData, .rtfd)
+        ]
+        for (data, docType) in candidates {
+            guard let data else { continue }
+            // Let AppKit infer the charset: forcing .characterEncoding would
+            // override <meta charset> and break non-UTF-8 HTML.
+            let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [.documentType: docType]
+            guard let attr = try? NSAttributedString(data: data, options: options, documentAttributes: nil),
+                  !attr.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            return attr.string
+        }
+        return nil
+    }
+
+    private static func snapshotPasteboardItems(_ pasteboard: NSPasteboard) -> [NSPasteboardItem] {
+        (pasteboard.pasteboardItems ?? []).compactMap { oldItem in
+            let copy = NSPasteboardItem()
+            var copied = false
+            for type in oldItem.types {
+                if let data = oldItem.data(forType: type) {
+                    copy.setData(data, forType: type)
+                    copied = true
+                }
+            }
+            return copied ? copy : nil
+        }
     }
 
     /// Returns false if CGEvent creation fails (typically Accessibility permission missing).

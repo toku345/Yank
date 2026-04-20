@@ -128,9 +128,9 @@ final class ViewerStateTests: XCTestCase {
     // MARK: - paste / close route to pendingAction
 
     func testPaste_setsPendingAction() {
-        state.perform(.paste)
+        state.perform(.paste(.original))
 
-        XCTAssertEqual(state.pendingAction, .paste)
+        XCTAssertEqual(state.pendingAction, .paste(.original))
     }
 
     func testClose_setsPendingAction() {

@@ -72,6 +72,11 @@ log stream --predicate 'subsystem == "com.toku345.Yank"' --level debug
 - **SwiftUI List のプログラム的スクロール**: `selection` binding の変更だけではスクロールしない。`ScrollViewReader` + `scrollTo` + `.id()` が必要。
 - **XCTestCase の setUp**: `setUp()` は non-throwing。throwing variant は `setUpWithError() throws`。`override func setUp() throws` はコンパイルエラーになる。
 - **LSUIElement と NSAlert**: `LSUIElement = true`（メニューバーアプリ）でも `NSAlert.runModal()` は前面に表示される。ユーザー向けエラー通知に使える。
+- **NSEvent.modifierFlags の残留**: `keyDown` イベントの `modifierFlags` は、直前の Cmd+Shift+V ホットキーや Ctrl+N/P 組み合わせのフラグを引きずることがある。Return キー単体でも `.control`/`.shift` が立って見える。信頼できる判定が必要な場合は `flagsChanged` イベントで自前追跡する（`ViewerPanel.trackedModifiers` 参照）。また `modifierFlags` にはデバイス依存ビット（`0x100` 等）が混ざるので `.intersection(.deviceIndependentFlagsMask)` で絞る。
+- **CGEventSource.flagsState はテスト不可**: 物理キーボードの状態を直接返すため、XCTest から偽装できない。キー修飾子判定はイベント経由（`flagsChanged`）に寄せる方がテスト可能性が高い。
+- **NSPasteboard.clearContents の呼び位置**: バリデーションの**後**に呼ぶ。書き込み内容を導出する前に `clearContents()` すると、途中で失敗した場合にユーザーの既存クリップボードが破壊される（`PasteService.writePlainTextToPasteboard` 参照）。
+- **Swift 暗黙 return switch と let 文**: `case X: .foo` 形式の暗黙 return switch で case 内に `let` 文を挟むと、contextual type 推論が壊れ `.paste` 等が未解決になる。明示的に `return` を使うか、switch の外で導出する。
+- **xcodegen generate の再実行タイミング**: `project.yml` 変更時と Swift ファイル新規追加・削除時のみ必須（`sources:` は自動収集）。既存ファイルの編集だけなら `xcodebuild` 直接実行で十分。
 
 ## ADR (Architecture Decision Records)
 
