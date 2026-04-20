@@ -13,9 +13,6 @@ enum PasteService {
 
     @discardableResult
     static func writeToPasteboard(item: ClipItem) -> Bool {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
         // Use NSPasteboardItem (modern API) exclusively.
         // Apple SDK: "declareTypes should not be used with writeObjects"
         let pbItem = NSPasteboardItem()
@@ -40,13 +37,22 @@ enum PasteService {
             objects.append(contentsOf: nsurls)
         }
 
-        let success = pasteboard.writeObjects(objects)
-        if !success {
-            logger.error("writeObjects failed for: \(item.title, privacy: .private)")
-        } else {
-            logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
+        let pasteboard = NSPasteboard.general
+        // Snapshot for restore: writeObjects can fail after clearContents
+        // (rare) and without this the user's previous clipboard is lost.
+        let snapshot = snapshotPasteboardItems(pasteboard)
+        pasteboard.clearContents()
+
+        guard pasteboard.writeObjects(objects) else {
+            logger.error("writeObjects failed; restoring snapshot for: \(item.title, privacy: .private)")
+            pasteboard.clearContents()
+            if !snapshot.isEmpty {
+                _ = pasteboard.writeObjects(snapshot)
+            }
+            return false
         }
-        return success
+        logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
+        return true
     }
 
     @discardableResult

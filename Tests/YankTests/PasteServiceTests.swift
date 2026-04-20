@@ -9,6 +9,25 @@ final class PasteServiceTests: XCTestCase {
         return try ModelContainer(for: ClipItem.self, configurations: config)
     }
 
+    func testWriteToPasteboard_withStringValue_writesString() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let item = ClipItem(
+            title: "Plain",
+            primaryType: "public.utf8-plain-text",
+            availableTypes: ["public.utf8-plain-text"],
+            stringValue: "Hello, original!"
+        )
+        context.insert(item)
+        try context.save()
+
+        let result = PasteService.writeToPasteboard(item: item)
+
+        XCTAssertTrue(result)
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Hello, original!")
+    }
+
     func testWritePlainText_withStringValue_writesStringOnly() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
