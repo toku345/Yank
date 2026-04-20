@@ -37,18 +37,8 @@ enum PasteService {
             objects.append(contentsOf: nsurls)
         }
 
-        let pasteboard = NSPasteboard.general
-        // Snapshot for restore: writeObjects can fail after clearContents
-        // (rare) and without this the user's previous clipboard is lost.
-        let snapshot = snapshotPasteboardItems(pasteboard)
-        pasteboard.clearContents()
-
-        guard pasteboard.writeObjects(objects) else {
-            logger.error("writeObjects failed; restoring snapshot for: \(item.title, privacy: .private)")
-            pasteboard.clearContents()
-            if !snapshot.isEmpty {
-                _ = pasteboard.writeObjects(snapshot)
-            }
+        guard writePreservingOnFailure(objects, to: .general) else {
+            logger.error("writeObjects failed; restored snapshot for: \(item.title, privacy: .private)")
             return false
         }
         logger.debug("Wrote to pasteboard: \(item.title, privacy: .private)")
@@ -64,27 +54,34 @@ enum PasteService {
             return false
         }
 
-        let pasteboard = NSPasteboard.general
-        // Snapshot for restore: writeObjects can fail after clearContents
-        // (rare) and without this the user's previous clipboard is lost.
-        let snapshot = snapshotPasteboardItems(pasteboard)
-        pasteboard.clearContents()
-
         let pbItem = NSPasteboardItem()
         pbItem.setString(textValue, forType: .string)
         // Self-paste suppression marker (ADR 0002)
         pbItem.setString("", forType: .fromYank)
 
-        guard pasteboard.writeObjects([pbItem]) else {
-            logger.error("writePlainTextToPasteboard failed; restoring snapshot for: \(item.title, privacy: .private)")
-            pasteboard.clearContents()
-            if !snapshot.isEmpty {
-                _ = pasteboard.writeObjects(snapshot)
-            }
+        guard writePreservingOnFailure([pbItem], to: .general) else {
+            logger.error("writePlainTextToPasteboard failed; restored snapshot for: \(item.title, privacy: .private)")
             return false
         }
         logger.debug("Wrote plain text to pasteboard: \(item.title, privacy: .private)")
         return true
+    }
+
+    /// Snapshots the pasteboard, clears it, writes `objects`, and restores
+    /// the snapshot on failure. Protects the user's clipboard against the
+    /// rare case where writeObjects returns false after clearContents.
+    private static func writePreservingOnFailure(
+        _ objects: [NSPasteboardWriting],
+        to pasteboard: NSPasteboard
+    ) -> Bool {
+        let snapshot = snapshotPasteboardItems(pasteboard)
+        pasteboard.clearContents()
+        if pasteboard.writeObjects(objects) { return true }
+        pasteboard.clearContents()
+        if !snapshot.isEmpty {
+            _ = pasteboard.writeObjects(snapshot)
+        }
+        return false
     }
 
     private static func derivePlainText(from item: ClipItem) -> String? {
@@ -105,10 +102,9 @@ enum PasteService {
         ]
         for (data, docType) in candidates {
             guard let data else { continue }
-            var options: [NSAttributedString.DocumentReadingOptionKey: Any] = [.documentType: docType]
-            if docType == .html {
-                options[.characterEncoding] = String.Encoding.utf8.rawValue
-            }
+            // Let AppKit infer the charset: forcing .characterEncoding would
+            // override <meta charset> and break non-UTF-8 HTML.
+            let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [.documentType: docType]
             guard let attr = try? NSAttributedString(data: data, options: options, documentAttributes: nil),
                   !attr.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
             return attr.string
