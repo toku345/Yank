@@ -78,8 +78,8 @@ enum PasteService {
         pasteboard.clearContents()
         if pasteboard.writeObjects(objects) { return true }
         pasteboard.clearContents()
-        if !snapshot.isEmpty {
-            _ = pasteboard.writeObjects(snapshot)
+        if !snapshot.isEmpty, !pasteboard.writeObjects(snapshot) {
+            logger.warning("Failed to restore pasteboard snapshot; user clipboard may be empty")
         }
         return false
     }
