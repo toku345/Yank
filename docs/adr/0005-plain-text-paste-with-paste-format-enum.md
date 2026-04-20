@@ -21,14 +21,14 @@ Yank 経由でブラウザからコピーしたリッチテキストをペース
 **アプローチ B: `.paste(PasteFormat)` associated value 方式** を採用する。
 
 - `PasteFormat` enum (`original` | `plainText`) を導入し、`ViewerAction.paste` に associated value として持たせる。
-- `EmacsKeyHandler` で Return → `.paste(.original)`、Shift+Return → `.paste(.plainText)` を生成。
+- `EmacsKeyHandler` で Return → `.paste(.original)`、Ctrl+Return → `.paste(.plainText)` を生成。Shift+Return は多くのテキストフィールドで改行挿入に割り当てられているため、Emacs キーバインドとの親和性が高い Ctrl 修飾子を採用。
 - `PasteService.writePlainTextToPasteboard(item:)` を新設。ユーザー向けペイロードとして `.string` 型のみを書き出す（self-paste suppression マーカー `.fromYank` は維持。ADR 0002 参照）。テキスト導出の優先順位: (1) `stringValue` → そのまま使用、(2) `fileURLs` → ファイルパス文字列に変換。いずれもない場合（画像のみ等）は `false` を返す。
 - `ClipItem` のキャプチャ・保存は変更しない。全型を保存し続け、書き出し時のみフォーマットを制御する。
 - マウスタップは `.original` 固定。
 
 ## Consequences
 
-- **Positive**: ユーザーが Shift+Return でプレーンテキストペーストを選択でき、Yank 側で確実にフォーマットを制御できる。クロージャーチェーンが1本のままで、ペースト処理パスも統一される。
+- **Positive**: ユーザーが Ctrl+Return でプレーンテキストペーストを選択でき、Yank 側で確実にフォーマットを制御できる。クロージャーチェーンが1本のままで、ペースト処理パスも統一される。
 - **Positive**: `ClipItem` に全型を保存しているため、将来「元のフォーマットでペースト」オプションとの互換性がある。
 - **Negative**: `ViewerAction.paste` の全参照箇所（テスト含む約7箇所）を修正する必要がある。ただし機械的な変更。
-- **Risk**: テキスト表現を持たない ClipItem で Shift+Return した場合、パネルが開いたまま無反応になる。将来的に `NSSound.beep()` 等のフィードバックを検討する。
+- **Risk**: テキスト表現を持たない ClipItem で Ctrl+Return した場合、パネルが開いたまま無反応になる。将来的に `NSSound.beep()` 等のフィードバックを検討する。
