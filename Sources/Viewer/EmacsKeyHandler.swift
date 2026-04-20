@@ -1,11 +1,19 @@
 import AppKit
 
 enum EmacsKeyHandler {
-    static func handle(event: NSEvent) -> ViewerAction? {
-        // Return is handled by keyCode at the top level.
+    /// - Parameters:
+    ///   - event: The raw key-down event from `sendEvent`.
+    ///   - trackedModifiers: Modifier flags tracked via `flagsChanged` events
+    ///     in ViewerPanel. Used for Return key detection because
+    ///     `event.modifierFlags` carries stale state from prior key combos.
+    static func handle(
+        event: NSEvent,
+        trackedModifiers: NSEvent.ModifierFlags = []
+    ) -> ViewerAction? {
+        // Return is handled by keyCode with tracked modifiers.
         // Ctrl+Return → plain text, bare Return → original format.
         if event.keyCode == 36 {
-            return event.modifierFlags.contains(.control)
+            return trackedModifiers.contains(.control)
                 ? .paste(.plainText)
                 : .paste(.original)
         }

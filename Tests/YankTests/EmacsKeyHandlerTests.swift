@@ -40,7 +40,10 @@ final class EmacsKeyHandlerTests: XCTestCase {
 
     func testControlReturn_pastesPlainText() {
         let event = makeKeyEvent(keyCode: 36, modifierFlags: .control)
-        XCTAssertEqual(EmacsKeyHandler.handle(event: event), .paste(.plainText))
+        XCTAssertEqual(
+            EmacsKeyHandler.handle(event: event, trackedModifiers: .control),
+            .paste(.plainText)
+        )
     }
 
     func testEscape_closes() {
