@@ -4,20 +4,20 @@ enum EmacsKeyHandler {
     /// - Parameters:
     ///   - event: The raw key-down event from `sendEvent`.
     ///   - trackedModifiers: Modifier flags tracked via `flagsChanged` events
-    ///     in ViewerPanel. Used for Return key detection because
-    ///     `event.modifierFlags` carries stale state from prior key combos.
+    ///     in ViewerPanel. Used for all control-shortcut dispatch because
+    ///     `event.modifierFlags` carries stale state from prior key combos
+    ///     (see ViewerPanel.trackedModifiers).
     static func handle(
         event: NSEvent,
         trackedModifiers: NSEvent.ModifierFlags = []
     ) -> ViewerAction? {
-        // Return is handled by keyCode with tracked modifiers.
         // Ctrl+Return → plain text, bare Return → original format.
         if event.keyCode == 36 {
             return trackedModifiers.contains(.control)
                 ? .paste(.plainText)
                 : .paste(.original)
         }
-        if event.modifierFlags.contains(.control) {
+        if trackedModifiers.contains(.control) {
             return handleControl(event: event)
         }
         return handlePlain(event: event)
