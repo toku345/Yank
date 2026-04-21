@@ -1,0 +1,5 @@
+# git-worktree-runner (gtr) team config
+# https://github.com/coderabbitai/git-worktree-runner
+
+[hooks]
+	postCreate = ln -s \"$REPO_ROOT/.envrc\" .envrc
