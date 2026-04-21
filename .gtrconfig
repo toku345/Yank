@@ -3,3 +3,4 @@
 
 [hooks]
 	postCreate = ln -sfn \"$REPO_ROOT/.envrc\" .envrc
+	postCreate = direnv allow
