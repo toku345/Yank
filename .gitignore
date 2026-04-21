@@ -26,5 +26,8 @@ Package.resolved
 SupportingFiles/Info.plist
 SupportingFiles/Yank.entitlements
 
+# direnv
+.envrc
+
 # Misc
 *.log
