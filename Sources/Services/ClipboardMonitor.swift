@@ -78,10 +78,10 @@ final class ClipboardMonitor {
         case noRestorablePayload
     }
 
-    /// Reads pasteboard data. Skips capture markers and entries without restorable payloads.
+    /// Reads pasteboard data. Skips external capture markers and entries without restorable payloads.
     private func readPasteboard() -> PasteboardReadResult {
         guard let types = pasteboard.types, !types.isEmpty else { return .skipped(.noTypes) }
-        if let marker = types.first(where: { NSPasteboard.PasteboardType.captureSkipMarkers.contains($0) }) {
+        if let marker = types.first(where: { NSPasteboard.PasteboardType.externalCaptureSkipMarkers.contains($0) }) {
             return .skipped(.captureSkipMarker(marker))
         }
 
