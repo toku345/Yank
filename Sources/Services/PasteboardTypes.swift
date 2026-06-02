@@ -1,8 +1,8 @@
 import AppKit
 
-// Self-paste suppression inspired by Maccy (MIT License, Copyright 2025 Alex Rodionov)
-// https://github.com/p0deje/Maccy
 extension NSPasteboard.PasteboardType {
+    // Self-paste suppression inspired by Maccy (MIT License, Copyright 2025 Alex Rodionov)
+    // https://github.com/p0deje/Maccy
     static let fromYank = NSPasteboard.PasteboardType("com.toku345.Yank.self-paste")
 
     static let concealed = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")

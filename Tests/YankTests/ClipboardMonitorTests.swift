@@ -10,6 +10,14 @@ final class ClipboardMonitorTests: XCTestCase {
         return ModelContext(container)
     }
 
+    private func waitForClipboardPoll(description: String = "wait for poll") {
+        let expectation = expectation(description: description)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
+    }
+
     func testCapturesClipboardChange() throws {
         let context = try makeContext()
         let monitor = ClipboardMonitor(modelContext: context)
@@ -23,11 +31,7 @@ final class ClipboardMonitorTests: XCTestCase {
         }
         pasteboard.setString("test capture", forType: .string)
 
-        let expectation = expectation(description: "clip captured")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
+        waitForClipboardPoll(description: "clip captured")
 
         let items = try context.fetch(FetchDescriptor<ClipItem>())
         let captured = items.first(where: { $0.stringValue == "test capture" })
@@ -51,11 +55,7 @@ final class ClipboardMonitorTests: XCTestCase {
         pasteboard.setString("self-pasted content", forType: .string)
         pasteboard.setString("", forType: .fromYank)
 
-        let expectation = expectation(description: "wait for poll")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
+        waitForClipboardPoll()
 
         let items = try context.fetch(FetchDescriptor<ClipItem>())
         let selfPasted = items.first(where: { $0.stringValue == "self-pasted content" })
@@ -86,18 +86,25 @@ final class ClipboardMonitorTests: XCTestCase {
                 pasteboard.clearContents()
             }
 
+            let unmarkedValue = "unmarked content \(marker.rawValue)"
+            XCTAssertTrue(pasteboard.setString(unmarkedValue, forType: .string))
+            waitForClipboardPoll(description: "capture control \(marker.rawValue)")
+
+            var items = try context.fetch(FetchDescriptor<ClipItem>())
+            let unmarked = items.first(where: { $0.stringValue == unmarkedValue })
+            XCTAssertNotNil(unmarked, "Unmarked content should be captured: \(marker.rawValue)")
+
+            pasteboard.clearContents()
             let value = "sensitive content \(marker.rawValue)"
             pasteboard.declareTypes([.string, marker], owner: nil)
-            pasteboard.setString(value, forType: .string)
-            pasteboard.setString("", forType: marker)
+            XCTAssertTrue(pasteboard.setString(value, forType: .string))
+            XCTAssertTrue(pasteboard.setString("", forType: marker))
+            XCTAssertTrue(pasteboard.types?.contains(.string) == true)
+            XCTAssertTrue(pasteboard.types?.contains(marker) == true)
 
-            let expectation = expectation(description: "wait for poll \(marker.rawValue)")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                expectation.fulfill()
-            }
-            wait(for: [expectation], timeout: 1.0)
+            waitForClipboardPoll(description: "skip marker \(marker.rawValue)")
 
-            let items = try context.fetch(FetchDescriptor<ClipItem>())
+            items = try context.fetch(FetchDescriptor<ClipItem>())
             let captured = items.first(where: { $0.stringValue == value })
             XCTAssertNil(captured, "Marked content should not be captured: \(marker.rawValue)")
 
