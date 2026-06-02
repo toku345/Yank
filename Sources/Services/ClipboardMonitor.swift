@@ -124,7 +124,10 @@ final class ClipboardMonitor {
         case let .skipped(.captureSkipMarker(marker)):
             logger.debug("Skipping clip due to pasteboard skip marker: \(marker.rawValue, privacy: .public)")
             return
-        case .skipped(.noTypes), .skipped(.noRestorablePayload):
+        case .skipped(.noTypes):
+            logger.debug("Skipping clip with no pasteboard types")
+            return
+        case .skipped(.noRestorablePayload):
             logger.debug("Skipping clip with no restorable payload")
             return
         }
