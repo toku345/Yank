@@ -70,6 +70,9 @@ final class ClipboardMonitor {
     /// Reads pasteboard data. Returns nil if no restorable payload exists.
     private func readPasteboard() -> PasteboardSnapshot? {
         guard let types = pasteboard.types, !types.isEmpty else { return nil }
+        if types.contains(where: { NSPasteboard.PasteboardType.captureSkipMarkers.contains($0) }) {
+            return nil
+        }
 
         let availableTypes = types.map(\.rawValue)
         // Treat whitespace-only strings as nil — they have no user value
