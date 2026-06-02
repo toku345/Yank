@@ -67,9 +67,23 @@ final class ClipboardMonitor {
         }
     }
 
-    /// Reads pasteboard data. Returns nil if no restorable payload exists.
-    private func readPasteboard() -> PasteboardSnapshot? {
-        guard let types = pasteboard.types, !types.isEmpty else { return nil }
+    private enum PasteboardReadResult {
+        case snapshot(PasteboardSnapshot)
+        case skipped(PasteboardSkipReason)
+    }
+
+    private enum PasteboardSkipReason {
+        case noTypes
+        case captureSkipMarker(NSPasteboard.PasteboardType)
+        case noRestorablePayload
+    }
+
+    /// Reads pasteboard data. Skips external capture markers and entries without restorable payloads.
+    private func readPasteboard() -> PasteboardReadResult {
+        guard let types = pasteboard.types, !types.isEmpty else { return .skipped(.noTypes) }
+        if let marker = types.first(where: { NSPasteboard.PasteboardType.externalCaptureSkipMarkers.contains($0) }) {
+            return .skipped(.captureSkipMarker(marker))
+        }
 
         let availableTypes = types.map(\.rawValue)
         // Treat whitespace-only strings as nil — they have no user value
@@ -92,18 +106,28 @@ final class ClipboardMonitor {
         // Skip entries that PasteService cannot restore
         guard stringValue != nil || rtfData != nil || rtfdData != nil
                 || htmlData != nil || pdfData != nil || imageData != nil || hasFileURLs else {
-            return nil
+            return .skipped(.noRestorablePayload)
         }
 
-        return PasteboardSnapshot(
+        return .snapshot(PasteboardSnapshot(
             availableTypes: availableTypes, primaryType: availableTypes[0],
             stringValue: stringValue, rtfData: rtfData, rtfdData: rtfdData,
             htmlData: htmlData, pdfData: pdfData, imageData: imageData, fileURLs: fileURLs
-        )
+        ))
     }
 
     private func captureClipboard() {
-        guard let snapshot = readPasteboard() else {
+        let snapshot: PasteboardSnapshot
+        switch readPasteboard() {
+        case let .snapshot(readSnapshot):
+            snapshot = readSnapshot
+        case let .skipped(.captureSkipMarker(marker)):
+            logger.debug("Skipping clip due to pasteboard skip marker: \(marker.rawValue, privacy: .public)")
+            return
+        case .skipped(.noTypes):
+            logger.debug("Skipping clip with no pasteboard types")
+            return
+        case .skipped(.noRestorablePayload):
             logger.debug("Skipping clip with no restorable payload")
             return
         }

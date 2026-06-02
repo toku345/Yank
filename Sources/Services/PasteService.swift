@@ -2,12 +2,6 @@ import AppKit
 import Carbon.HIToolbox
 import os.log
 
-// Self-paste suppression inspired by Maccy (MIT License, Copyright 2025 Alex Rodionov)
-// https://github.com/p0deje/Maccy
-extension NSPasteboard.PasteboardType {
-    static let fromYank = NSPasteboard.PasteboardType("com.toku345.Yank.self-paste")
-}
-
 enum PasteService {
     private static let logger = Logger(subsystem: "com.toku345.Yank", category: "PasteService")
 
