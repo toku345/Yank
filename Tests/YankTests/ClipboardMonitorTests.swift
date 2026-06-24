@@ -145,7 +145,7 @@ final class ClipboardMonitorTests: XCTestCase {
         let items = try context.fetch(descriptor)
         let values = items.compactMap(\.stringValue)
 
-        XCTAssertLessThanOrEqual(items.count, 2)
+        XCTAssertEqual(items.count, 2)
         XCTAssertTrue(values.contains("newest item"))
         XCTAssertTrue(values.contains("middle item"))
         XCTAssertFalse(values.contains("oldest item"))
@@ -181,6 +181,7 @@ final class ClipboardMonitorTests: XCTestCase {
 
         XCTAssertTrue(pasteboard.setString("trigger item", forType: .string))
         waitForClipboardPoll(description: "trigger captured")
+        waitForClipboardPoll(description: "prune continuations completed")
 
         let descriptor = FetchDescriptor<ClipItem>(
             sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
