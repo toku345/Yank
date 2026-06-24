@@ -5,6 +5,7 @@ import os.log
 
 private enum ClipboardHistoryPolicy {
     static let defaultLimit = 1_000
+    static let pruneBatchSize = 100
 }
 
 @MainActor
@@ -14,13 +15,19 @@ final class ClipboardMonitor {
     private var timer: Timer?
     private let modelContext: ModelContext
     private let historyLimit: Int
+    private let historyPruneBatchSize: Int
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ClipboardMonitor")
 
     private var lastCapturedFingerprint: Int?
 
-    init(modelContext: ModelContext, historyLimit: Int = ClipboardHistoryPolicy.defaultLimit) {
+    init(
+        modelContext: ModelContext,
+        historyLimit: Int = ClipboardHistoryPolicy.defaultLimit,
+        historyPruneBatchSize: Int = ClipboardHistoryPolicy.pruneBatchSize
+    ) {
         self.modelContext = modelContext
         self.historyLimit = max(1, historyLimit)
+        self.historyPruneBatchSize = max(1, historyPruneBatchSize)
         self.lastChangeCount = pasteboard.changeCount
     }
 
@@ -149,27 +156,53 @@ final class ClipboardMonitor {
         )
 
         let item = makeClipItem(from: snapshot, title: title)
-        modelContext.insert(item)
-        do {
-            try modelContext.save()
-        } catch {
-            modelContext.delete(item)
-            logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
-            return
-        }
+        guard saveClipItem(item) else { return }
 
-        do {
-            try enforceHistoryLimit()
-        } catch {
-            logger.error(
-                "Failed to prune clipboard history: \(error.localizedDescription, privacy: .public)"
-            )
-        }
+        pruneHistoryAfterCapture()
         lastCapturedFingerprint = fingerprint
 
         logger.debug(
             "Captured clip: \(title, privacy: .private) (\(snapshot.primaryType, privacy: .public))"
         )
+    }
+
+    private func saveClipItem(_ item: ClipItem) -> Bool {
+        modelContext.insert(item)
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            modelContext.delete(item)
+            logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
+    private func pruneHistoryAfterCapture() {
+        var pruneProgress = HistoryPruneProgress()
+        do {
+            try enforceHistoryLimit(progress: &pruneProgress)
+            if pruneProgress.deletedCount > 0 {
+                logger.debug(
+                    """
+                    Pruned clipboard history: deleted=\(pruneProgress.deletedCount, privacy: .public), \
+                    batches=\(pruneProgress.batchCount, privacy: .public), \
+                    limit=\(self.historyLimit, privacy: .public)
+                    """
+                )
+            }
+        } catch {
+            logger.error(
+                """
+                Failed to prune clipboard history; \
+                limit=\(self.historyLimit, privacy: .public), \
+                batchSize=\(self.historyPruneBatchSize, privacy: .public), \
+                deleted=\(pruneProgress.deletedCount, privacy: .public), \
+                pendingDelete=\(pruneProgress.pendingDeleteCount, privacy: .public): \
+                \(error.localizedDescription, privacy: .public)
+                """
+            )
+        }
     }
 
     private func makeClipItem(from snapshot: PasteboardSnapshot, title: String) -> ClipItem {
@@ -187,17 +220,32 @@ final class ClipboardMonitor {
         )
     }
 
-    private func enforceHistoryLimit() throws {
-        let descriptor = FetchDescriptor<ClipItem>(
-            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
-        )
-        let items = try modelContext.fetch(descriptor)
-        guard items.count > historyLimit else { return }
+    private struct HistoryPruneProgress {
+        var deletedCount = 0
+        var batchCount = 0
+        var pendingDeleteCount = 0
+    }
 
-        for item in items.dropFirst(historyLimit) {
-            modelContext.delete(item)
+    private func enforceHistoryLimit(progress: inout HistoryPruneProgress) throws {
+        while true {
+            var descriptor = FetchDescriptor<ClipItem>(
+                sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
+            )
+            descriptor.fetchOffset = historyLimit
+            descriptor.fetchLimit = historyPruneBatchSize
+
+            let overflowItems = try modelContext.fetch(descriptor)
+            guard !overflowItems.isEmpty else { return }
+
+            progress.pendingDeleteCount = overflowItems.count
+            for item in overflowItems {
+                modelContext.delete(item)
+            }
+            try modelContext.save()
+            progress.deletedCount += overflowItems.count
+            progress.batchCount += 1
+            progress.pendingDeleteCount = 0
         }
-        try modelContext.save()
     }
 
     static func deriveTitle(stringValue: String?, availableTypes: [String], fileURLs: [String]?) -> String {

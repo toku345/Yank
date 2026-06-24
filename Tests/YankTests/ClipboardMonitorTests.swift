@@ -150,4 +150,47 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertTrue(values.contains("middle item"))
         XCTAssertFalse(values.contains("oldest item"))
     }
+
+    func testPrunesSeededOverflowItemsAcrossBatches() throws {
+        let context = try makeContext()
+        let seededDate = Date(timeIntervalSinceNow: -1_000)
+        for index in 0..<7 {
+            context.insert(ClipItem(
+                title: "seed \(index)",
+                primaryType: NSPasteboard.PasteboardType.string.rawValue,
+                availableTypes: [NSPasteboard.PasteboardType.string.rawValue],
+                stringValue: "seed \(index)",
+                createdAt: seededDate.addingTimeInterval(TimeInterval(index))
+            ))
+        }
+        try context.save()
+
+        let monitor = ClipboardMonitor(
+            modelContext: context,
+            historyLimit: 2,
+            historyPruneBatchSize: 2
+        )
+        monitor.start()
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        addTeardownBlock {
+            monitor.stop()
+            pasteboard.clearContents()
+        }
+
+        XCTAssertTrue(pasteboard.setString("trigger item", forType: .string))
+        waitForClipboardPoll(description: "trigger captured")
+
+        let descriptor = FetchDescriptor<ClipItem>(
+            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
+        )
+        let items = try context.fetch(descriptor)
+        let values = items.compactMap(\.stringValue)
+
+        XCTAssertEqual(items.count, 2)
+        XCTAssertTrue(values.contains("trigger item"))
+        XCTAssertTrue(values.contains("seed 6"))
+        XCTAssertFalse(values.contains("seed 0"))
+    }
 }
