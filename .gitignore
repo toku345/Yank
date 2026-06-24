@@ -4,6 +4,7 @@
 xcuserdata/
 DerivedData/
 .derivedData*/
+com.apple.DeveloperTools/
 build/
 *.pbxuser
 *.mode1v3
