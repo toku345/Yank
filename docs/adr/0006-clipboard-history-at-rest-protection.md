@@ -30,7 +30,17 @@ Use a staged, dependency-free mitigation first:
 5. Defer SQLCipher or another encrypted-store dependency until the project explicitly accepts an external dependency and migration cost.
 6. Defer Keychain-backed payload storage to a later sensitive-item slice, after Yank has reliable sensitive classification or explicit user marking.
 
+The first implementation slice may harden the current SwiftData store family, but it is not required to preserve the existing store if a cleaner destructive redesign is chosen.
+
 This means Issue #27 should not be closed by file protection alone unless the issue acceptance criteria are narrowed to "best-effort OS file protection." A plaintext scan of the SQLite store while the user session is unlocked may still reveal clipboard content.
+
+## Migration Policy
+
+Yank is currently a personal project, so early security hardening may use destructive local data changes when that produces a simpler and safer design.
+
+Existing local clipboard history may be discarded during at-rest protection work. Backward-compatible migration from plaintext stores is not required for early security slices. Store reset, schema replacement, or rebuilding the local SwiftData store is acceptable when it materially reduces complexity, avoids preserving insecure plaintext rows, or enables a cleaner storage model.
+
+This policy does not relax the privacy boundary: implementation and verification must not inspect, collect, log, or publish the user's real clipboard contents, existing SwiftData store contents, or private runtime logs.
 
 ## Options Considered
 
@@ -64,12 +74,14 @@ Positive:
 - Preserves the current zero external dependency policy.
 - Gives an immediate, reviewable implementation slice with measurable filesystem attributes.
 - Avoids prematurely committing to SQLCipher before migration and key-management design are understood.
+- Allows early security slices to avoid compatibility migration work when local data reset is simpler and safer.
 - Keeps the path open for stronger sensitive-item handling in Phase 3.
 
 Negative:
 
 - Does not provide full database encryption.
 - Does not satisfy a "no plaintext visible to `strings` while unlocked" requirement for all clipboard history.
+- Local clipboard history may be lost during security upgrades.
 - Requires clear documentation so users do not mistake file protection for protection against active same-user malware.
 - Store sidecars must be handled carefully; protecting only the main `.store` file is insufficient.
 
@@ -107,6 +119,7 @@ For later stronger options:
    - Apply `NSFileProtectionCompleteUnlessOpen` or the closest supported value.
    - Apply owner-only file permissions.
    - Reapply on launch to cover WAL/SHM sidecars.
+   - Reset or rebuild the local store if that is simpler than preserving existing plaintext files.
    - Add tests using a temporary store path.
 
 2. Sensitive capture avoidance:
@@ -122,9 +135,10 @@ For later stronger options:
    - Define a payload reference model in SwiftData.
    - Store only explicitly sensitive, small payloads in Keychain.
    - Keep metadata minimal and non-sensitive in SwiftData.
+   - Prefer a clean model over compatibility migration from existing plaintext rows.
    - Define failure behavior when Keychain data is missing or inaccessible.
 
 5. Full encrypted-store spike:
    - Evaluate SQLCipher or another encrypted SQLite approach against SwiftData/Core Data compatibility.
    - Decide whether the security benefit justifies adding a runtime dependency.
-   - Define key storage, migration, backup, and recovery behavior before implementation.
+   - Define key storage, destructive store replacement, backup, and recovery behavior before implementation.
