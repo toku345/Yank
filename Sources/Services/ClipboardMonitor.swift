@@ -3,18 +3,24 @@ import SwiftData
 import UniformTypeIdentifiers
 import os.log
 
+private enum ClipboardHistoryPolicy {
+    static let defaultLimit = 1_000
+}
+
 @MainActor
 final class ClipboardMonitor {
     private let pasteboard = NSPasteboard.general
     private var lastChangeCount: Int
     private var timer: Timer?
     private let modelContext: ModelContext
+    private let historyLimit: Int
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ClipboardMonitor")
 
     private var lastCapturedFingerprint: Int?
 
-    init(modelContext: ModelContext) {
+    init(modelContext: ModelContext, historyLimit: Int = ClipboardHistoryPolicy.defaultLimit) {
         self.modelContext = modelContext
+        self.historyLimit = max(1, historyLimit)
         self.lastChangeCount = pasteboard.changeCount
     }
 
@@ -142,7 +148,32 @@ final class ClipboardMonitor {
             fileURLs: snapshot.fileURLs
         )
 
-        let item = ClipItem(
+        let item = makeClipItem(from: snapshot, title: title)
+        modelContext.insert(item)
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.delete(item)
+            logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+
+        do {
+            try enforceHistoryLimit()
+        } catch {
+            logger.error(
+                "Failed to prune clipboard history: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+        lastCapturedFingerprint = fingerprint
+
+        logger.debug(
+            "Captured clip: \(title, privacy: .private) (\(snapshot.primaryType, privacy: .public))"
+        )
+    }
+
+    private func makeClipItem(from snapshot: PasteboardSnapshot, title: String) -> ClipItem {
+        ClipItem(
             title: title,
             primaryType: snapshot.primaryType,
             availableTypes: snapshot.availableTypes,
@@ -154,18 +185,19 @@ final class ClipboardMonitor {
             imageData: snapshot.imageData,
             fileURLs: snapshot.fileURLs
         )
-        modelContext.insert(item)
-        do {
-            try modelContext.save()
-            lastCapturedFingerprint = fingerprint
-        } catch {
-            modelContext.delete(item)
-            logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
-        }
+    }
 
-        logger.debug(
-            "Captured clip: \(title, privacy: .private) (\(snapshot.primaryType, privacy: .public))"
+    private func enforceHistoryLimit() throws {
+        let descriptor = FetchDescriptor<ClipItem>(
+            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
         )
+        let items = try modelContext.fetch(descriptor)
+        guard items.count > historyLimit else { return }
+
+        for item in items.dropFirst(historyLimit) {
+            modelContext.delete(item)
+        }
+        try modelContext.save()
     }
 
     static func deriveTitle(stringValue: String?, availableTypes: [String], fileURLs: [String]?) -> String {

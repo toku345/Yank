@@ -115,4 +115,39 @@ final class ClipboardMonitorTests: XCTestCase {
             )
         }
     }
+
+    func testPrunesOldestItemsWhenHistoryLimitIsExceeded() throws {
+        let context = try makeContext()
+        let monitor = ClipboardMonitor(modelContext: context, historyLimit: 2)
+        monitor.start()
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        addTeardownBlock {
+            monitor.stop()
+            pasteboard.clearContents()
+        }
+
+        XCTAssertTrue(pasteboard.setString("oldest item", forType: .string))
+        waitForClipboardPoll(description: "oldest captured")
+
+        pasteboard.clearContents()
+        XCTAssertTrue(pasteboard.setString("middle item", forType: .string))
+        waitForClipboardPoll(description: "middle captured")
+
+        pasteboard.clearContents()
+        XCTAssertTrue(pasteboard.setString("newest item", forType: .string))
+        waitForClipboardPoll(description: "newest captured")
+
+        let descriptor = FetchDescriptor<ClipItem>(
+            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
+        )
+        let items = try context.fetch(descriptor)
+        let values = items.compactMap(\.stringValue)
+
+        XCTAssertLessThanOrEqual(items.count, 2)
+        XCTAssertTrue(values.contains("newest item"))
+        XCTAssertTrue(values.contains("middle item"))
+        XCTAssertFalse(values.contains("oldest item"))
+    }
 }
