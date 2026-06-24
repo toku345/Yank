@@ -11,7 +11,7 @@ You are triaging the Yank repository. Your job is to identify a small number of 
 
 - Do not edit files, create branches, open pull requests, or commit changes.
 - Do not run destructive commands.
-- Do not collect clipboard contents, SwiftData store contents, or private runtime logs unless the user explicitly asks.
+- Do not collect clipboard contents, SwiftData store contents, or private runtime logs.
 - Do not run heavy multi-agent review gates for routine triage.
 - Prefer read-only inspection and the smallest relevant verification.
 
