@@ -17,7 +17,7 @@ You are triaging the Yank repository. Your job is to identify a small number of 
 
 ## Context To Inspect
 
-1. Read active repository guidance: `AGENTS.md` and `CLAUDE.md` if both are present.
+1. Read active repository guidance once from `AGENTS.md` / `CLAUDE.md`.
 2. Inspect product state: `README.md`, `PLAN.md`, and `docs/adr/`.
 3. Inspect delivery state: `.github/workflows/ci.yml`, `git status --short`, and recent commits.
 4. Search for concrete signals with `rg`, including `TODO`, `FIXME`, `Phase 2`, `Snippet`, `C-f`, `C-b`, `sensitive`, `login`, and `search`.
