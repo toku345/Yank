@@ -3,18 +3,74 @@ import SwiftData
 import UniformTypeIdentifiers
 import os.log
 
+private enum ClipboardHistoryPolicy {
+    static let defaultLimit = 1_000
+    static let pruneBatchSize = 100
+    static let pruneContinuationDelay: TimeInterval = 0.05
+}
+
+private struct PasteboardSnapshot {
+    let availableTypes: [String]
+    let primaryType: String
+    let stringValue: String?
+    let rtfData, rtfdData, htmlData, pdfData, imageData: Data?
+    let fileURLs: [String]?
+
+    var fingerprint: Int {
+        var hasher = Hasher()
+        hasher.combine(stringValue)
+        hasher.combine(primaryType)
+        hasher.combine(rtfData)
+        hasher.combine(rtfdData)
+        hasher.combine(htmlData)
+        hasher.combine(pdfData)
+        hasher.combine(imageData)
+        hasher.combine(fileURLs)
+        return hasher.finalize()
+    }
+}
+
+private enum PasteboardReadResult {
+    case snapshot(PasteboardSnapshot)
+    case skipped(PasteboardSkipReason)
+}
+
+private enum PasteboardSkipReason {
+    case noTypes
+    case captureSkipMarker(NSPasteboard.PasteboardType)
+    case noRestorablePayload
+}
+
+private struct HistoryPruneProgress {
+    var deletedCount = 0
+    var batchCount = 0
+    var pendingDeleteCount = 0
+}
+
 @MainActor
 final class ClipboardMonitor {
     private let pasteboard = NSPasteboard.general
     private var lastChangeCount: Int
     private var timer: Timer?
     private let modelContext: ModelContext
+    private let historyLimit: Int
+    private let historyPruneBatchSize: Int
+    private let historyPruneContinuationDelay: TimeInterval
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ClipboardMonitor")
 
     private var lastCapturedFingerprint: Int?
+    private var historyPruneContinuationTask: Task<Void, Never>?
 
-    init(modelContext: ModelContext) {
+    init(
+        modelContext: ModelContext,
+        historyLimit: Int = ClipboardHistoryPolicy.defaultLimit,
+        historyPruneBatchSize: Int = ClipboardHistoryPolicy.pruneBatchSize,
+        historyPruneContinuationDelay: TimeInterval = ClipboardHistoryPolicy.pruneContinuationDelay
+    ) {
         self.modelContext = modelContext
+        self.historyLimit = max(1, historyLimit)
+        self.historyPruneBatchSize = max(1, historyPruneBatchSize)
+        self.historyPruneContinuationDelay = max(0, historyPruneContinuationDelay)
         self.lastChangeCount = pasteboard.changeCount
     }
 
@@ -32,6 +88,8 @@ final class ClipboardMonitor {
     func stop() {
         timer?.invalidate()
         timer = nil
+        historyPruneContinuationTask?.cancel()
+        historyPruneContinuationTask = nil
         logger.info("Stopped clipboard monitoring")
     }
 
@@ -44,38 +102,6 @@ final class ClipboardMonitor {
         if pasteboard.types?.contains(.fromYank) == true { return }
 
         captureClipboard()
-    }
-
-    private struct PasteboardSnapshot {
-        let availableTypes: [String]
-        let primaryType: String
-        let stringValue: String?
-        let rtfData, rtfdData, htmlData, pdfData, imageData: Data?
-        let fileURLs: [String]?
-
-        var fingerprint: Int {
-            var hasher = Hasher()
-            hasher.combine(stringValue)
-            hasher.combine(primaryType)
-            hasher.combine(rtfData)
-            hasher.combine(rtfdData)
-            hasher.combine(htmlData)
-            hasher.combine(pdfData)
-            hasher.combine(imageData)
-            hasher.combine(fileURLs)
-            return hasher.finalize()
-        }
-    }
-
-    private enum PasteboardReadResult {
-        case snapshot(PasteboardSnapshot)
-        case skipped(PasteboardSkipReason)
-    }
-
-    private enum PasteboardSkipReason {
-        case noTypes
-        case captureSkipMarker(NSPasteboard.PasteboardType)
-        case noRestorablePayload
     }
 
     /// Reads pasteboard data. Skips external capture markers and entries without restorable payloads.
@@ -142,7 +168,99 @@ final class ClipboardMonitor {
             fileURLs: snapshot.fileURLs
         )
 
-        let item = ClipItem(
+        let item = makeClipItem(from: snapshot, title: title)
+        guard saveClipItem(item) else { return }
+
+        pruneHistoryAfterCapture()
+        lastCapturedFingerprint = fingerprint
+
+        logger.debug(
+            "Captured clip: \(title, privacy: .private) (\(snapshot.primaryType, privacy: .public))"
+        )
+    }
+
+    private func saveClipItem(_ item: ClipItem) -> Bool {
+        modelContext.insert(item)
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            modelContext.delete(item)
+            logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
+    private func pruneHistoryAfterCapture() {
+        var pruneProgress = HistoryPruneProgress()
+        do {
+            let deletedCount = try pruneOverflowBatch(progress: &pruneProgress)
+            logSuccessfulPruneIfNeeded(pruneProgress)
+            if deletedCount == historyPruneBatchSize {
+                scheduleHistoryPruneContinuation()
+            }
+        } catch {
+            logPruneFailure(error, progress: pruneProgress)
+        }
+    }
+
+    private func continueHistoryPruning() {
+        historyPruneContinuationTask = nil
+
+        var pruneProgress = HistoryPruneProgress()
+        do {
+            let deletedCount = try pruneOverflowBatch(progress: &pruneProgress)
+            logSuccessfulPruneIfNeeded(pruneProgress)
+            if deletedCount == historyPruneBatchSize {
+                scheduleHistoryPruneContinuation()
+            }
+        } catch {
+            logPruneFailure(error, progress: pruneProgress)
+        }
+    }
+
+    private func scheduleHistoryPruneContinuation() {
+        guard historyPruneContinuationTask == nil else { return }
+
+        let delay = historyPruneContinuationDelay
+        historyPruneContinuationTask = Task { [weak self] in
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            } else {
+                await Task.yield()
+            }
+            guard !Task.isCancelled else { return }
+            self?.continueHistoryPruning()
+        }
+    }
+
+    private func logSuccessfulPruneIfNeeded(_ progress: HistoryPruneProgress) {
+        guard progress.deletedCount > 0 else { return }
+
+        logger.debug(
+            """
+            Pruned clipboard history: deleted=\(progress.deletedCount, privacy: .public), \
+            batches=\(progress.batchCount, privacy: .public), \
+            limit=\(self.historyLimit, privacy: .public)
+            """
+        )
+    }
+
+    private func logPruneFailure(_ error: Error, progress: HistoryPruneProgress) {
+        logger.error(
+            """
+            Failed to prune clipboard history; \
+            limit=\(self.historyLimit, privacy: .public), \
+            batchSize=\(self.historyPruneBatchSize, privacy: .public), \
+            deleted=\(progress.deletedCount, privacy: .public), \
+            pendingDelete=\(progress.pendingDeleteCount, privacy: .public): \
+            \(error.localizedDescription, privacy: .public)
+            """
+        )
+    }
+
+    private func makeClipItem(from snapshot: PasteboardSnapshot, title: String) -> ClipItem {
+        ClipItem(
             title: title,
             primaryType: snapshot.primaryType,
             availableTypes: snapshot.availableTypes,
@@ -154,18 +272,27 @@ final class ClipboardMonitor {
             imageData: snapshot.imageData,
             fileURLs: snapshot.fileURLs
         )
-        modelContext.insert(item)
-        do {
-            try modelContext.save()
-            lastCapturedFingerprint = fingerprint
-        } catch {
-            modelContext.delete(item)
-            logger.error("Failed to save ClipItem: \(error.localizedDescription, privacy: .public)")
-        }
+    }
 
-        logger.debug(
-            "Captured clip: \(title, privacy: .private) (\(snapshot.primaryType, privacy: .public))"
+    private func pruneOverflowBatch(progress: inout HistoryPruneProgress) throws -> Int {
+        var descriptor = FetchDescriptor<ClipItem>(
+            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
         )
+        descriptor.fetchOffset = historyLimit
+        descriptor.fetchLimit = historyPruneBatchSize
+
+        let overflowItems = try modelContext.fetch(descriptor)
+        guard !overflowItems.isEmpty else { return 0 }
+
+        progress.pendingDeleteCount = overflowItems.count
+        for item in overflowItems {
+            modelContext.delete(item)
+        }
+        try modelContext.save()
+        progress.deletedCount += overflowItems.count
+        progress.batchCount += 1
+        progress.pendingDeleteCount = 0
+        return overflowItems.count
     }
 
     static func deriveTitle(stringValue: String?, availableTypes: [String], fileURLs: [String]?) -> String {
