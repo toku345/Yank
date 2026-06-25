@@ -41,6 +41,9 @@ struct StoreFileKind {
 
 struct StoreHardeningService {
     static let defaultStoreBaseName = "Yank.store"
+    // The main store plus the SQLite sidecars SwiftData can produce. Matching exact suffixes
+    // (rather than a bare prefix) avoids chmodding unrelated files like Yank.store.bak.
+    private static let storeFamilySuffixes = ["", "-wal", "-shm", "-journal"]
 
     private let directory: URL
     private let storeBaseName: String
@@ -106,6 +109,11 @@ struct StoreHardeningService {
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
     }
 
+    // Known gap: hardening runs once at launch. SQLite creates the -wal/-shm sidecars lazily
+    // on the first write transaction, so on a first launch (or after the sidecars are removed)
+    // they are created at the process umask default and stay that way until the next launch
+    // reapplies hardening. This is accepted under ADR 0006's best-effort scope; see the ADR's
+    // Security Limitations.
     private func storeFamilyURLs() throws -> [URL] {
         guard fileManager.fileExists(atPath: directory.path) else { return [] }
 
@@ -119,7 +127,7 @@ struct StoreHardeningService {
 
     private func isStoreFamilyFile(_ url: URL) -> Bool {
         let fileName = url.lastPathComponent
-        return fileName.hasPrefix(storeBaseName)
+        return Self.storeFamilySuffixes.contains { fileName == storeBaseName + $0 }
     }
 
     // A store-family-named entry is hardened only when we can confirm it is a regular,

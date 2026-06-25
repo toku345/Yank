@@ -44,19 +44,37 @@ final class StoreHardeningServiceTests: XCTestCase {
         let directory = try makeTemporaryDirectory()
         try createStoreFamilyFiles(in: directory)
 
-        // A symlink whose name matches the store prefix must not be followed: hardening it
-        // would chmod the (possibly attacker- or app-pointed) target.
+        // A store-family-named symlink must not be followed: hardening it would chmod the
+        // (possibly attacker- or app-pointed) target. Use a family suffix (-journal) so the
+        // entry reaches the classify symlink guard rather than being filtered out by name.
         let target = try makeTemporaryDirectory().appendingPathComponent("external-secret")
         fileManager.createFile(atPath: target.path, contents: Data("target".utf8))
         try fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: target.path)
-        let symlink = directory.appendingPathComponent("Yank.store-link")
+        let symlink = directory.appendingPathComponent("Yank.store-journal")
         try fileManager.createSymbolicLink(atPath: symlink.path, withDestinationPath: target.path)
 
         let report = StoreHardeningService(directory: directory).hardenStoreFamily()
 
         XCTAssertTrue(report.succeeded)
-        XCTAssertFalse(report.files.map(\.url.lastPathComponent).contains("Yank.store-link"))
+        XCTAssertFalse(report.files.map(\.url.lastPathComponent).contains("Yank.store-journal"))
         XCTAssertEqual(try permissions(for: target), 0o644)
+    }
+
+    func testExcludesStorePrefixedFileOutsideKnownSuffixes() throws {
+        let directory = try makeTemporaryDirectory()
+        try createStoreFamilyFiles(in: directory)
+
+        // hasPrefix("Yank.store") would also match unrelated artifacts; only the known SQLite
+        // sidecar suffixes should be hardened, leaving e.g. a backup file untouched.
+        let unrelated = directory.appendingPathComponent("Yank.store.bak")
+        fileManager.createFile(atPath: unrelated.path, contents: Data("backup".utf8))
+        try fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: unrelated.path)
+
+        let report = StoreHardeningService(directory: directory).hardenStoreFamily()
+
+        XCTAssertTrue(report.succeeded)
+        XCTAssertFalse(report.files.map(\.url.lastPathComponent).contains("Yank.store.bak"))
+        XCTAssertEqual(try permissions(for: unrelated), 0o644)
     }
 
     func testReportsFailureWhenDirectoryCannotBeListed() throws {
