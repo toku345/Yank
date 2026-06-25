@@ -34,21 +34,48 @@ private enum StoreFileClassification {
     case inspectionFailed(String)
 }
 
+struct StoreFileKind {
+    let isRegularFile: Bool
+    let isSymbolicLink: Bool
+}
+
 struct StoreHardeningService {
     static let defaultStoreBaseName = "Yank.store"
 
     private let directory: URL
     private let storeBaseName: String
     private let fileManager: FileManager
+    // Resource inspection is injected so the "could not inspect / could not determine
+    // support" error paths are reachable in tests; the real FileManager seam cannot make
+    // URL.resourceValues throw on demand.
+    private let inspectFileKind: (URL) throws -> StoreFileKind
+    private let inspectVolumeProtectionSupport: (URL) throws -> Bool
 
     init(
         directory: URL = Self.defaultStoreDirectory(),
         storeBaseName: String = Self.defaultStoreBaseName,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        inspectFileKind: @escaping (URL) throws -> StoreFileKind = Self.defaultInspectFileKind,
+        inspectVolumeProtectionSupport: @escaping (URL) throws -> Bool = Self.defaultVolumeProtectionSupport
     ) {
         self.directory = directory
         self.storeBaseName = storeBaseName
         self.fileManager = fileManager
+        self.inspectFileKind = inspectFileKind
+        self.inspectVolumeProtectionSupport = inspectVolumeProtectionSupport
+    }
+
+    static func defaultInspectFileKind(_ url: URL) throws -> StoreFileKind {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        return StoreFileKind(
+            isRegularFile: values.isRegularFile ?? false,
+            isSymbolicLink: values.isSymbolicLink ?? false
+        )
+    }
+
+    static func defaultVolumeProtectionSupport(_ url: URL) throws -> Bool {
+        let values = try url.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
+        return (values.allValues[.volumeSupportsFileProtectionKey] as? Bool) ?? false
     }
 
     func hardenStoreFamily() -> StoreHardeningReport {
@@ -102,20 +129,20 @@ struct StoreHardeningService {
     // dropped — otherwise an unverifiable store file would be left at its prior permissions
     // while the report still claimed success.
     private func classify(_ url: URL) -> StoreFileClassification {
-        let values: URLResourceValues
+        let kind: StoreFileKind
         do {
-            values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            kind = try inspectFileKind(url)
         } catch {
             return .inspectionFailed("could not inspect store file: \(error.localizedDescription)")
         }
-        guard values.isRegularFile == true, values.isSymbolicLink != true else {
+        guard kind.isRegularFile, !kind.isSymbolicLink else {
             return .skip
         }
         return .harden
     }
 
     private func harden(_ url: URL, report: inout StoreHardeningReport) {
-        let supportsFileProtection = volumeSupportsFileProtection(url)
+        let supportsFileProtection = fileProtectionSupport(for: url, report: &report)
         var attributes: [FileAttributeKey: Any] = [.posixPermissions: 0o600]
         if supportsFileProtection == true {
             attributes[.protectionKey] = FileProtectionType.completeUnlessOpen
@@ -139,9 +166,20 @@ struct StoreHardeningService {
         }
     }
 
-    private func volumeSupportsFileProtection(_ url: URL) -> Bool? {
-        let values = try? url.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
-        return values?.allValues[.volumeSupportsFileProtectionKey] as? Bool
+    // Returns nil when the volume's file-protection support could not be determined. That
+    // case is recorded as a failure (mirroring classify's inspectionFailed) so the report
+    // does not claim a clean success while the protection class was never confirmed; owner-only
+    // permissions are still applied by the caller regardless.
+    private func fileProtectionSupport(for url: URL, report: inout StoreHardeningReport) -> Bool? {
+        do {
+            return try inspectVolumeProtectionSupport(url)
+        } catch {
+            report.failures.append(StoreHardeningFailure(
+                url: url,
+                description: "could not determine file protection support: \(error.localizedDescription)"
+            ))
+            return nil
+        }
     }
 
     private func verify(
