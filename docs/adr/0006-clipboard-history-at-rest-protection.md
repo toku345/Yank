@@ -94,6 +94,7 @@ Negative:
 - Retention cap limits the number of stored items but does not reduce exposure for the newest retained entries.
 - Skip markers reduce capture of known sensitive external clipboard formats only after those markers are implemented and only for apps that publish such markers.
 - Keychain storage protects only payloads routed there; classification false negatives remain a risk.
+- Hardening reapplies at launch, but SQLite creates the `-wal`/`-shm` sidecars lazily on the first write transaction. On a first launch (or after the sidecars are removed) they are created after hardening has run and stay at the process umask default for that session until the next launch reapplies hardening.
 
 ## Verification Plan
 
