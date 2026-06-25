@@ -28,6 +28,12 @@ struct StoreHardeningFailure: Error {
     let description: String
 }
 
+private enum StoreFileClassification {
+    case harden
+    case skip
+    case inspectionFailed(String)
+}
+
 struct StoreHardeningService {
     static let defaultStoreBaseName = "Yank.store"
 
@@ -56,7 +62,14 @@ struct StoreHardeningService {
         }
 
         for url in storeFiles {
-            harden(url, report: &report)
+            switch classify(url) {
+            case .harden:
+                harden(url, report: &report)
+            case .skip:
+                continue
+            case .inspectionFailed(let description):
+                report.failures.append(StoreHardeningFailure(url: url, description: description))
+            }
         }
         return report
     }
@@ -74,7 +87,6 @@ struct StoreHardeningService {
             includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]
         )
         .filter(isStoreFamilyFile)
-        .filter(isRegularNonSymlinkFile)
         .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
@@ -83,9 +95,23 @@ struct StoreHardeningService {
         return fileName.hasPrefix(storeBaseName)
     }
 
-    private func isRegularNonSymlinkFile(_ url: URL) -> Bool {
-        let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-        return values?.isRegularFile == true && values?.isSymbolicLink != true
+    // A store-family-named entry is hardened only when we can confirm it is a regular,
+    // non-symlink file. Symlinks and non-regular files are intentionally skipped (hardening
+    // must not follow a symlink onto an unintended target). An inspection error means we
+    // could not determine the kind, which is reported as a failure rather than silently
+    // dropped — otherwise an unverifiable store file would be left at its prior permissions
+    // while the report still claimed success.
+    private func classify(_ url: URL) -> StoreFileClassification {
+        let values: URLResourceValues
+        do {
+            values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        } catch {
+            return .inspectionFailed("could not inspect store file: \(error.localizedDescription)")
+        }
+        guard values.isRegularFile == true, values.isSymbolicLink != true else {
+            return .skip
+        }
+        return .harden
     }
 
     private func harden(_ url: URL, report: inout StoreHardeningReport) {
