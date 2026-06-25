@@ -25,6 +25,7 @@ final class AppCoordinator {
             fatalError("Failed to create ModelContainer: \(error)")
         }
         modelContainer = container
+        hardenStoreFamily()
 
         let context = ModelContext(container)
 
@@ -92,6 +93,28 @@ final class AppCoordinator {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
         if !AXIsProcessTrustedWithOptions(options) {
             logger.warning("Accessibility permission not granted. Paste will not work.")
+        }
+    }
+
+    private func hardenStoreFamily() {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+
+        let report = StoreHardeningService().hardenStoreFamily()
+        if report.succeeded {
+            logger.debug(
+                """
+                Store hardening completed: files=\(report.files.count, privacy: .public), \
+                fileProtectionUnsupported=\(report.fileProtectionUnsupportedCount, privacy: .public)
+                """
+            )
+        } else {
+            logger.error(
+                """
+                Store hardening completed with failures: \
+                files=\(report.files.count, privacy: .public), \
+                failures=\(report.failures.count, privacy: .public)
+                """
+            )
         }
     }
 
