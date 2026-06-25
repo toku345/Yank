@@ -74,6 +74,50 @@ final class StoreHardeningServiceTests: XCTestCase {
         XCTAssertTrue(report.files.isEmpty)
     }
 
+    func testRecordsFailureWhenFileInspectionThrows() throws {
+        let directory = try makeTemporaryDirectory()
+        let storeFiles = try createStoreFamilyFiles(in: directory)
+
+        // When resourceValues cannot determine the file kind, the entry must be reported as a
+        // failure rather than silently dropped — otherwise an unverifiable store file is left
+        // at its prior permissions while the report claims success (the pre-fix bug).
+        let service = StoreHardeningService(
+            directory: directory,
+            inspectFileKind: { _ in throw TestError.inspectionFailed }
+        )
+
+        let report = service.hardenStoreFamily()
+
+        XCTAssertFalse(report.succeeded)
+        XCTAssertEqual(report.failures.count, storeFiles.count)
+        XCTAssertTrue(report.files.isEmpty)
+    }
+
+    func testRecordsFailureWhenProtectionSupportProbeThrows() throws {
+        let directory = try makeTemporaryDirectory()
+        let storeFiles = try createStoreFamilyFiles(in: directory)
+
+        // A failing protection-support probe must be recorded as a failure (not silently
+        // treated as verified), while owner-only permissions are still applied.
+        let service = StoreHardeningService(
+            directory: directory,
+            inspectVolumeProtectionSupport: { _ in throw TestError.inspectionFailed }
+        )
+
+        let report = service.hardenStoreFamily()
+
+        XCTAssertFalse(report.succeeded)
+        XCTAssertEqual(report.failures.count, storeFiles.count)
+        XCTAssertEqual(report.files.count, storeFiles.count)
+        for url in storeFiles {
+            XCTAssertEqual(try permissions(for: url), 0o600)
+        }
+    }
+
+    private enum TestError: Error {
+        case inspectionFailed
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = fileManager.temporaryDirectory
             .appendingPathComponent("YankStoreHardeningTests", isDirectory: true)
