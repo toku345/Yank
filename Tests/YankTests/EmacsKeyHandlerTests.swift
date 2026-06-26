@@ -105,9 +105,19 @@ final class EmacsKeyHandlerTests: XCTestCase {
         XCTAssertEqual(EmacsKeyHandler.handle(event: event), .deleteSelected)
     }
 
+    func testRepeatedDelete_returnsNil() {
+        let event = makeKeyEvent(keyCode: 51, isARepeat: true)
+        XCTAssertNil(EmacsKeyHandler.handle(event: event))
+    }
+
     func testForwardDelete_deletesSelectedItem() {
         let event = makeKeyEvent(keyCode: 117)
         XCTAssertEqual(EmacsKeyHandler.handle(event: event), .deleteSelected)
+    }
+
+    func testRepeatedForwardDelete_returnsNil() {
+        let event = makeKeyEvent(keyCode: 117, isARepeat: true)
+        XCTAssertNil(EmacsKeyHandler.handle(event: event))
     }
 
     func testDownArrow_movesDown() {
@@ -149,7 +159,11 @@ final class EmacsKeyHandlerTests: XCTestCase {
         )!
     }
 
-    private func makeKeyEvent(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags = []) -> NSEvent {
+    private func makeKeyEvent(
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags = [],
+        isARepeat: Bool = false
+    ) -> NSEvent {
         NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -159,7 +173,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
             context: nil,
             characters: "",
             charactersIgnoringModifiers: "",
-            isARepeat: false,
+            isARepeat: isARepeat,
             keyCode: keyCode
         )!
     }

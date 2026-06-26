@@ -37,8 +37,8 @@ enum EmacsKeyHandler {
     private static func handlePlain(event: NSEvent) -> ViewerAction? {
         switch event.keyCode {
         case 53:  .close      // Escape
-        case 51:  .deleteSelected // Delete / Backspace
-        case 117: .deleteSelected // Forward Delete
+        case 51:  event.isARepeat ? nil : .deleteSelected // Delete / Backspace
+        case 117: event.isARepeat ? nil : .deleteSelected // Forward Delete
         case 125: .move(.down) // Down arrow
         case 126: .move(.up)   // Up arrow
         default:  nil
