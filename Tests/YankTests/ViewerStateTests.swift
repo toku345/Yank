@@ -16,8 +16,8 @@ final class ViewerStateTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeItemIDs(count: Int) throws -> [PersistentIdentifier] {
-        try (0..<count).map { i in
+    private func makeItems(count: Int) throws -> [ClipItem] {
+        let items = (0..<count).map { i in
             let item = ClipItem(
                 title: "Item \(i)",
                 primaryType: "public.utf8-plain-text",
@@ -25,9 +25,14 @@ final class ViewerStateTests: XCTestCase {
                 stringValue: "content \(i)"
             )
             context.insert(item)
-            try context.save()
-            return item.persistentModelID
+            return item
         }
+        try context.save()
+        return items
+    }
+
+    private func makeItemIDs(count: Int) throws -> [PersistentIdentifier] {
+        try makeItems(count: count).map(\.persistentModelID)
     }
 
     // MARK: - move(.down)
@@ -125,7 +130,7 @@ final class ViewerStateTests: XCTestCase {
         XCTAssertEqual(state.selectedID, ids[2])
     }
 
-    // MARK: - paste / close route to pendingAction
+    // MARK: - pendingAction routing
 
     func testPaste_setsPendingAction() {
         state.perform(.paste(.original))
@@ -137,6 +142,78 @@ final class ViewerStateTests: XCTestCase {
         state.perform(.close)
 
         XCTAssertEqual(state.pendingAction, .close)
+    }
+
+    func testDeleteSelected_setsPendingAction() {
+        state.perform(.deleteSelected)
+
+        XCTAssertEqual(state.pendingAction, .deleteSelected)
+    }
+
+    func testClearHistory_setsPendingAction() {
+        state.perform(.clearHistory)
+
+        XCTAssertEqual(state.pendingAction, .clearHistory)
+    }
+
+    // MARK: - Deletion selection updates
+
+    func testRemoveItem_fromMiddle_selectsNextItem() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        state.removeItem(id: ids[1])
+
+        XCTAssertEqual(state.itemIDs, [ids[0], ids[2]])
+        XCTAssertEqual(state.selectedID, ids[2])
+    }
+
+    func testRemoveItem_fromLast_selectsPreviousItem() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[2]
+
+        state.removeItem(id: ids[2])
+
+        XCTAssertEqual(state.itemIDs, [ids[0], ids[1]])
+        XCTAssertEqual(state.selectedID, ids[1])
+    }
+
+    func testRemoveItem_onlyItem_clearsSelection() throws {
+        let ids = try makeItemIDs(count: 1)
+        state.itemIDs = ids
+        state.selectedID = ids[0]
+
+        state.removeItem(id: ids[0])
+
+        XCTAssertEqual(state.itemIDs, [])
+        XCTAssertNil(state.selectedID)
+    }
+
+    func testReplaceItems_whenSelectionWasDeleted_selectsFirst() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        state.replaceItems(with: [ids[0], ids[2]])
+
+        XCTAssertEqual(state.itemIDs, [ids[0], ids[2]])
+        XCTAssertEqual(state.selectedID, ids[0])
+    }
+
+    func testReplaceItems_whenSelectionStillPresent_keepsSelection() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        // A newer item is prepended (newest-first) while the current
+        // selection is still present; selection must not jump to the top.
+        let newID = try makeItemIDs(count: 1)[0]
+        state.replaceItems(with: [newID] + ids)
+
+        XCTAssertEqual(state.itemIDs, [newID] + ids)
+        XCTAssertEqual(state.selectedID, ids[1])
     }
 
     // MARK: - Edge cases

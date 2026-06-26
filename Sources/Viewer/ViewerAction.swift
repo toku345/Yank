@@ -15,13 +15,15 @@ enum ViewerAction: Equatable {
     case jumpToStart
     case jumpToEnd
     case paste(PasteFormat)
+    case deleteSelected
+    case clearHistory
     case close
 }
 
 @Observable
 @MainActor
 final class ViewerState {
-    /// View-coordinating actions only (paste, close).
+    /// View-coordinating actions that require view/environment side effects.
     /// Movement actions are handled synchronously via perform().
     var pendingAction: ViewerAction?
 
@@ -36,9 +38,41 @@ final class ViewerState {
             selectedID = itemIDs.first
         case .jumpToEnd:
             selectedID = itemIDs.last
-        case .paste, .close:
+        case .paste, .deleteSelected, .clearHistory, .close:
             pendingAction = action
         }
+    }
+
+    func replaceItems(with newIDs: [PersistentIdentifier]) {
+        itemIDs = newIDs
+        guard !newIDs.isEmpty else {
+            selectedID = nil
+            return
+        }
+        if let selectedID, newIDs.contains(selectedID) {
+            return
+        }
+        selectedID = newIDs.first
+    }
+
+    func removeItem(id: PersistentIdentifier) {
+        guard let removedIndex = itemIDs.firstIndex(of: id) else {
+            replaceItems(with: itemIDs)
+            return
+        }
+
+        let newIDs = itemIDs.filter { $0 != id }
+        itemIDs = newIDs
+        guard !newIDs.isEmpty else {
+            selectedID = nil
+            return
+        }
+        selectedID = newIDs[min(removedIndex, newIDs.count - 1)]
+    }
+
+    func clearItems() {
+        itemIDs = []
+        selectedID = nil
     }
 
     private func moveSelection(_ direction: ViewerAction.Direction) {

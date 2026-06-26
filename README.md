@@ -59,11 +59,16 @@ On first launch, macOS will prompt for **Accessibility permission** (required fo
 | C-a | Jump to top |
 | C-e | Jump to bottom |
 | Return | Paste selected item |
+| Delete | Delete selected history item |
 | C-g / Escape | Close viewer |
 
 ### Data Deletion
 
-Yank stores clipboard history in a SwiftData store. To reset all data:
+Yank stores clipboard history in a SwiftData store. Use **Delete Selected** in the viewer to remove the
+selected item, or **Clear All** to remove all saved history. This does not clear the current system
+clipboard contents.
+
+To reset all data outside the app:
 
 ```bash
 rm -f ~/Library/Application\ Support/Yank.store*
