@@ -81,8 +81,8 @@ Yank stores restorable clipboard payloads in a SwiftData store. History is cappe
 items and older entries are pruned, but retained entries may still include plaintext strings,
 rich text, images, PDFs, and file URLs.
 
-Yank applies best-effort OS file protection and owner-only permissions to the `Yank.store*`
-files on launch when supported by the volume. This is defense-in-depth, not full database
+Yank applies owner-only permissions to the `Yank.store*` files on launch, plus best-effort OS
+file protection where the volume supports it. This is defense-in-depth, not full database
 encryption. SQLite sidecar files may be created after launch on first write and can remain at
 default permissions until the next launch reapplies hardening.
 
