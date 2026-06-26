@@ -1,8 +1,13 @@
 import AppKit
 import SwiftData
 import SwiftUI
+import os.log
 
 struct ViewerContentView: View {
+    private static let logger = Logger(
+        subsystem: "com.toku345.Yank", category: "ViewerContentView"
+    )
+
     @Environment(\.modelContext)
     private var modelContext
 
@@ -81,9 +86,10 @@ struct ViewerContentView: View {
                     viewerState: viewerState
                 )
             } catch {
-                NSSound.beep()
+                reportDeletionFailure(operation: "delete the selected item", error: error)
             }
         case .clearHistory:
+            guard confirmClearAll() else { return }
             do {
                 try HistoryDeletion.clearAll(
                     items: clipItems,
@@ -91,13 +97,40 @@ struct ViewerContentView: View {
                     viewerState: viewerState
                 )
             } catch {
-                NSSound.beep()
+                reportDeletionFailure(operation: "clear clipboard history", error: error)
             }
         case .close:
             onClose()
         case .move, .jumpToStart, .jumpToEnd:
             break
         }
+    }
+
+    private func confirmClearAll() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Clear all clipboard history?"
+        alert.informativeText = """
+            This permanently deletes all saved clipboard history and cannot be undone. \
+            Your current system clipboard contents are not affected.
+            """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Clear All").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func reportDeletionFailure(operation: String, error: Error) {
+        Self.logger.error(
+            "Failed to \(operation, privacy: .public): \(error.localizedDescription, privacy: .public)"
+        )
+        let alert = NSAlert()
+        alert.messageText = "Could not \(operation)"
+        alert.informativeText = """
+            Saving the change to clipboard history failed, so nothing was deleted. \
+            \(error.localizedDescription)
+            """
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 }
 
@@ -116,7 +149,12 @@ enum HistoryDeletion {
         }
 
         modelContext.delete(item)
-        try modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
         viewerState.removeItem(id: selectedID)
         return true
     }
@@ -129,7 +167,12 @@ enum HistoryDeletion {
         for item in items {
             modelContext.delete(item)
         }
-        try modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
         viewerState.clearItems()
     }
 }
