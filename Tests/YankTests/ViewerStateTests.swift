@@ -202,6 +202,20 @@ final class ViewerStateTests: XCTestCase {
         XCTAssertEqual(state.selectedID, ids[0])
     }
 
+    func testReplaceItems_whenSelectionStillPresent_keepsSelection() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        // A newer item is prepended (newest-first) while the current
+        // selection is still present; selection must not jump to the top.
+        let newID = try makeItemIDs(count: 1)[0]
+        state.replaceItems(with: [newID] + ids)
+
+        XCTAssertEqual(state.itemIDs, [newID] + ids)
+        XCTAssertEqual(state.selectedID, ids[1])
+    }
+
     // MARK: - SwiftData deletion actions
 
     func testDeleteSelectedItem_deletesSwiftDataRowAndSelectsNext() throws {
