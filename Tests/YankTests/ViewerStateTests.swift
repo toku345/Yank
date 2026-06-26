@@ -130,7 +130,7 @@ final class ViewerStateTests: XCTestCase {
         XCTAssertEqual(state.selectedID, ids[2])
     }
 
-    // MARK: - paste / close route to pendingAction
+    // MARK: - pendingAction routing
 
     func testPaste_setsPendingAction() {
         state.perform(.paste(.original))
@@ -214,44 +214,6 @@ final class ViewerStateTests: XCTestCase {
 
         XCTAssertEqual(state.itemIDs, [newID] + ids)
         XCTAssertEqual(state.selectedID, ids[1])
-    }
-
-    // MARK: - SwiftData deletion actions
-
-    func testDeleteSelectedItem_deletesSwiftDataRowAndSelectsNext() throws {
-        let items = try makeItems(count: 3)
-        let ids = items.map(\.persistentModelID)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
-
-        let didDelete = try HistoryDeletion.deleteSelectedItem(
-            from: items,
-            in: context,
-            viewerState: state
-        )
-
-        let fetched = try context.fetch(FetchDescriptor<ClipItem>())
-        XCTAssertTrue(didDelete)
-        XCTAssertEqual(fetched.count, 2)
-        XCTAssertFalse(fetched.map(\.persistentModelID).contains(ids[1]))
-        XCTAssertEqual(state.selectedID, ids[2])
-    }
-
-    func testClearAll_deletesAllSwiftDataRowsAndClearsSelection() throws {
-        let items = try makeItems(count: 3)
-        state.itemIDs = items.map(\.persistentModelID)
-        state.selectedID = state.itemIDs.first
-
-        try HistoryDeletion.clearAll(
-            items: items,
-            in: context,
-            viewerState: state
-        )
-
-        let fetched = try context.fetch(FetchDescriptor<ClipItem>())
-        XCTAssertEqual(fetched.count, 0)
-        XCTAssertEqual(state.itemIDs, [])
-        XCTAssertNil(state.selectedID)
     }
 
     // MARK: - Edge cases

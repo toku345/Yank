@@ -80,21 +80,26 @@ struct ViewerContentView: View {
             }
         case .deleteSelected:
             do {
-                _ = try HistoryDeletion.deleteSelectedItem(
+                let result = try HistoryDeletion.deleteSelectedItem(
                     from: clipItems,
                     in: modelContext,
                     viewerState: viewerState
                 )
+                if case .selectedItemMissing(let id) = result {
+                    Self.logger.warning(
+                        "Delete skipped because selected item was missing: \(String(describing: id), privacy: .public)"
+                    )
+                }
             } catch {
                 reportDeletionFailure(operation: "delete the selected item", error: error)
             }
         case .clearHistory:
-            guard confirmClearAll() else { return }
             do {
-                try HistoryDeletion.clearAll(
+                _ = try HistoryDeletion.clearAllIfConfirmed(
                     items: clipItems,
                     in: modelContext,
-                    viewerState: viewerState
+                    viewerState: viewerState,
+                    confirmClearAll: { confirmClearAll() }
                 )
             } catch {
                 reportDeletionFailure(operation: "clear clipboard history", error: error)
@@ -121,7 +126,13 @@ struct ViewerContentView: View {
 
     private func reportDeletionFailure(operation: String, error: Error) {
         Self.logger.error(
-            "Failed to \(operation, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            """
+            Failed to \(operation, privacy: .public); \
+            selectedID=\(String(describing: viewerState.selectedID), privacy: .public); \
+            itemCount=\(clipItems.count, privacy: .public); \
+            errorType=\(String(reflecting: type(of: error)), privacy: .public); \
+            error=\(error.localizedDescription, privacy: .public)
+            """
         )
         let alert = NSAlert()
         alert.messageText = "Could not \(operation)"
@@ -136,43 +147,76 @@ struct ViewerContentView: View {
 
 @MainActor
 enum HistoryDeletion {
-    @discardableResult
+    typealias SaveChanges = (ModelContext) throws -> Void
+
+    enum DeleteSelectedResult: Equatable {
+        case deleted
+        case noSelection
+        case selectedItemMissing(PersistentIdentifier)
+    }
+
     static func deleteSelectedItem(
         from items: [ClipItem],
         in modelContext: ModelContext,
-        viewerState: ViewerState
-    ) throws -> Bool {
-        guard let selectedID = viewerState.selectedID,
-              let item = items.first(where: { $0.persistentModelID == selectedID }) else {
+        viewerState: ViewerState,
+        saveChanges: SaveChanges = { try $0.save() }
+    ) throws -> DeleteSelectedResult {
+        guard let selectedID = viewerState.selectedID else {
             viewerState.replaceItems(with: items.map(\.persistentModelID))
-            return false
+            return .noSelection
+        }
+
+        guard let item = items.first(where: { $0.persistentModelID == selectedID }) else {
+            viewerState.replaceItems(with: items.map(\.persistentModelID))
+            return .selectedItemMissing(selectedID)
         }
 
         modelContext.delete(item)
-        do {
-            try modelContext.save()
-        } catch {
-            modelContext.rollback()
-            throw error
-        }
+        try saveOrRollback(in: modelContext, saveChanges: saveChanges)
         viewerState.removeItem(id: selectedID)
+        return .deleted
+    }
+
+    @discardableResult
+    static func clearAllIfConfirmed(
+        items: [ClipItem],
+        in modelContext: ModelContext,
+        viewerState: ViewerState,
+        confirmClearAll: () -> Bool,
+        saveChanges: SaveChanges = { try $0.save() }
+    ) throws -> Bool {
+        guard confirmClearAll() else { return false }
+        try clearAll(
+            items: items,
+            in: modelContext,
+            viewerState: viewerState,
+            saveChanges: saveChanges
+        )
         return true
     }
 
-    static func clearAll(
+    private static func clearAll(
         items: [ClipItem],
         in modelContext: ModelContext,
-        viewerState: ViewerState
+        viewerState: ViewerState,
+        saveChanges: SaveChanges = { try $0.save() }
     ) throws {
         for item in items {
             modelContext.delete(item)
         }
+        try saveOrRollback(in: modelContext, saveChanges: saveChanges)
+        viewerState.clearItems()
+    }
+
+    private static func saveOrRollback(
+        in modelContext: ModelContext,
+        saveChanges: SaveChanges
+    ) throws {
         do {
-            try modelContext.save()
+            try saveChanges(modelContext)
         } catch {
             modelContext.rollback()
             throw error
         }
-        viewerState.clearItems()
     }
 }

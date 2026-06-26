@@ -23,7 +23,7 @@ enum ViewerAction: Equatable {
 @Observable
 @MainActor
 final class ViewerState {
-    /// View-coordinating actions only (paste, close).
+    /// View-coordinating actions that require view/environment side effects.
     /// Movement actions are handled synchronously via perform().
     var pendingAction: ViewerAction?
 
@@ -57,7 +57,7 @@ final class ViewerState {
 
     func removeItem(id: PersistentIdentifier) {
         guard let removedIndex = itemIDs.firstIndex(of: id) else {
-            replaceItems(with: itemIDs.filter { $0 != id })
+            replaceItems(with: itemIDs)
             return
         }
 
