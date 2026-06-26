@@ -16,8 +16,8 @@ final class ViewerStateTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeItemIDs(count: Int) throws -> [PersistentIdentifier] {
-        try (0..<count).map { i in
+    private func makeItems(count: Int) throws -> [ClipItem] {
+        let items = (0..<count).map { i in
             let item = ClipItem(
                 title: "Item \(i)",
                 primaryType: "public.utf8-plain-text",
@@ -25,9 +25,14 @@ final class ViewerStateTests: XCTestCase {
                 stringValue: "content \(i)"
             )
             context.insert(item)
-            try context.save()
-            return item.persistentModelID
+            return item
         }
+        try context.save()
+        return items
+    }
+
+    private func makeItemIDs(count: Int) throws -> [PersistentIdentifier] {
+        try makeItems(count: count).map(\.persistentModelID)
     }
 
     // MARK: - move(.down)
@@ -137,6 +142,102 @@ final class ViewerStateTests: XCTestCase {
         state.perform(.close)
 
         XCTAssertEqual(state.pendingAction, .close)
+    }
+
+    func testDeleteSelected_setsPendingAction() {
+        state.perform(.deleteSelected)
+
+        XCTAssertEqual(state.pendingAction, .deleteSelected)
+    }
+
+    func testClearHistory_setsPendingAction() {
+        state.perform(.clearHistory)
+
+        XCTAssertEqual(state.pendingAction, .clearHistory)
+    }
+
+    // MARK: - Deletion selection updates
+
+    func testRemoveItem_fromMiddle_selectsNextItem() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        state.removeItem(id: ids[1])
+
+        XCTAssertEqual(state.itemIDs, [ids[0], ids[2]])
+        XCTAssertEqual(state.selectedID, ids[2])
+    }
+
+    func testRemoveItem_fromLast_selectsPreviousItem() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[2]
+
+        state.removeItem(id: ids[2])
+
+        XCTAssertEqual(state.itemIDs, [ids[0], ids[1]])
+        XCTAssertEqual(state.selectedID, ids[1])
+    }
+
+    func testRemoveItem_onlyItem_clearsSelection() throws {
+        let ids = try makeItemIDs(count: 1)
+        state.itemIDs = ids
+        state.selectedID = ids[0]
+
+        state.removeItem(id: ids[0])
+
+        XCTAssertEqual(state.itemIDs, [])
+        XCTAssertNil(state.selectedID)
+    }
+
+    func testReplaceItems_whenSelectionWasDeleted_selectsFirst() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        state.replaceItems(with: [ids[0], ids[2]])
+
+        XCTAssertEqual(state.itemIDs, [ids[0], ids[2]])
+        XCTAssertEqual(state.selectedID, ids[0])
+    }
+
+    // MARK: - SwiftData deletion actions
+
+    func testDeleteSelectedItem_deletesSwiftDataRowAndSelectsNext() throws {
+        let items = try makeItems(count: 3)
+        let ids = items.map(\.persistentModelID)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        let didDelete = try HistoryDeletion.deleteSelectedItem(
+            from: items,
+            in: context,
+            viewerState: state
+        )
+
+        let fetched = try context.fetch(FetchDescriptor<ClipItem>())
+        XCTAssertTrue(didDelete)
+        XCTAssertEqual(fetched.count, 2)
+        XCTAssertFalse(fetched.map(\.persistentModelID).contains(ids[1]))
+        XCTAssertEqual(state.selectedID, ids[2])
+    }
+
+    func testClearAll_deletesAllSwiftDataRowsAndClearsSelection() throws {
+        let items = try makeItems(count: 3)
+        state.itemIDs = items.map(\.persistentModelID)
+        state.selectedID = state.itemIDs.first
+
+        try HistoryDeletion.clearAll(
+            items: items,
+            in: context,
+            viewerState: state
+        )
+
+        let fetched = try context.fetch(FetchDescriptor<ClipItem>())
+        XCTAssertEqual(fetched.count, 0)
+        XCTAssertEqual(state.itemIDs, [])
+        XCTAssertNil(state.selectedID)
     }
 
     // MARK: - Edge cases

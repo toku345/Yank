@@ -100,6 +100,16 @@ final class EmacsKeyHandlerTests: XCTestCase {
         XCTAssertEqual(EmacsKeyHandler.handle(event: event), .close)
     }
 
+    func testDelete_deletesSelectedItem() {
+        let event = makeKeyEvent(keyCode: 51)
+        XCTAssertEqual(EmacsKeyHandler.handle(event: event), .deleteSelected)
+    }
+
+    func testForwardDelete_deletesSelectedItem() {
+        let event = makeKeyEvent(keyCode: 117)
+        XCTAssertEqual(EmacsKeyHandler.handle(event: event), .deleteSelected)
+    }
+
     func testDownArrow_movesDown() {
         let event = makeKeyEvent(keyCode: 125)
         XCTAssertEqual(EmacsKeyHandler.handle(event: event), .move(.down))

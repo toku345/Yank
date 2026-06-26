@@ -1,7 +1,11 @@
+import AppKit
 import SwiftData
 import SwiftUI
 
 struct ViewerContentView: View {
+    @Environment(\.modelContext)
+    private var modelContext
+
     @Query(sort: \ClipItem.createdAt, order: .reverse)
     private var clipItems: [ClipItem]
 
@@ -27,6 +31,8 @@ struct ViewerContentView: View {
                     }
                 )
             }
+            Divider()
+            historyControls
         }
         .frame(minWidth: 350, idealWidth: 400, minHeight: 300, idealHeight: 500)
         .onChange(of: viewerState.pendingAction) { _, action in
@@ -35,17 +41,29 @@ struct ViewerContentView: View {
             handleViewAction(action)
         }
         .onChange(of: clipItems.map(\.persistentModelID)) { _, newIDs in
-            viewerState.itemIDs = newIDs
-            if viewerState.selectedID == nil, let first = newIDs.first {
-                viewerState.selectedID = first
-            }
+            viewerState.replaceItems(with: newIDs)
         }
         .onAppear {
-            viewerState.itemIDs = clipItems.map(\.persistentModelID)
-            if viewerState.selectedID == nil, let first = clipItems.first {
-                viewerState.selectedID = first.persistentModelID
-            }
+            viewerState.replaceItems(with: clipItems.map(\.persistentModelID))
         }
+    }
+
+    private var historyControls: some View {
+        HStack {
+            Button("Delete Selected") {
+                viewerState.perform(.deleteSelected)
+            }
+            .disabled(viewerState.selectedID == nil)
+
+            Spacer()
+
+            Button("Clear All", role: .destructive) {
+                viewerState.perform(.clearHistory)
+            }
+            .disabled(clipItems.isEmpty)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     private func handleViewAction(_ action: ViewerAction) {
@@ -55,10 +73,63 @@ struct ViewerContentView: View {
                let item = clipItems.first(where: { $0.persistentModelID == id }) {
                 onPaste(item, format)
             }
+        case .deleteSelected:
+            do {
+                _ = try HistoryDeletion.deleteSelectedItem(
+                    from: clipItems,
+                    in: modelContext,
+                    viewerState: viewerState
+                )
+            } catch {
+                NSSound.beep()
+            }
+        case .clearHistory:
+            do {
+                try HistoryDeletion.clearAll(
+                    items: clipItems,
+                    in: modelContext,
+                    viewerState: viewerState
+                )
+            } catch {
+                NSSound.beep()
+            }
         case .close:
             onClose()
         case .move, .jumpToStart, .jumpToEnd:
             break
         }
+    }
+}
+
+@MainActor
+enum HistoryDeletion {
+    @discardableResult
+    static func deleteSelectedItem(
+        from items: [ClipItem],
+        in modelContext: ModelContext,
+        viewerState: ViewerState
+    ) throws -> Bool {
+        guard let selectedID = viewerState.selectedID,
+              let item = items.first(where: { $0.persistentModelID == selectedID }) else {
+            viewerState.replaceItems(with: items.map(\.persistentModelID))
+            return false
+        }
+
+        modelContext.delete(item)
+        try modelContext.save()
+        viewerState.removeItem(id: selectedID)
+        return true
+    }
+
+    static func clearAll(
+        items: [ClipItem],
+        in modelContext: ModelContext,
+        viewerState: ViewerState
+    ) throws {
+        for item in items {
+            modelContext.delete(item)
+        }
+        try modelContext.save()
+        viewerState.clearItems()
     }
 }
