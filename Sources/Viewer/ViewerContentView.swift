@@ -95,7 +95,7 @@ struct ViewerContentView: View {
             }
         case .clearHistory:
             do {
-                _ = try HistoryDeletion.clearAllIfConfirmed(
+                try HistoryDeletion.clearAllIfConfirmed(
                     items: clipItems,
                     in: modelContext,
                     viewerState: viewerState,
