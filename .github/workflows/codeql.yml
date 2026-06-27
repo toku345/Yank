@@ -46,7 +46,7 @@ jobs:
           xcodebuild -project Yank.xcodeproj \
             -scheme Yank \
             -configuration Debug \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath /tmp/yank-codeql-derived-data \
             build
 
