@@ -46,8 +46,10 @@ jobs:
           xcodebuild -project Yank.xcodeproj \
             -scheme Yank \
             -configuration Debug \
-            -destination 'platform=macOS,arch=arm64' \
+            -destination 'generic/platform=macOS' \
             -derivedDataPath /tmp/yank-codeql-derived-data \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
             build
 
       - name: Perform CodeQL Analysis
