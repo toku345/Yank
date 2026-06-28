@@ -32,3 +32,6 @@ SupportingFiles/Yank.entitlements
 
 # Misc
 *.log
+
+# Agent tooling (machine-specific)
+.codex/

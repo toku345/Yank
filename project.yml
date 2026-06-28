@@ -45,6 +45,10 @@ targets:
         ENABLE_HARDENED_RUNTIME: true
     postCompileScripts:
       - script: |
+          if [ "$YANK_SKIP_SWIFTLINT" = "1" ]; then
+            echo "SwiftLint skipped (YANK_SKIP_SWIFTLINT=1)"
+            exit 0
+          fi
           if command -v swiftlint > /dev/null 2>&1; then
             swiftlint lint --strict --quiet
           else
