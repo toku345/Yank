@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
@@ -63,6 +63,8 @@ jobs:
           build-mode: manual
 
       - name: Build
+        env:
+          YANK_SKIP_SWIFTLINT: "1"
         run: |
           xcodebuild -project Yank.xcodeproj \
             -scheme Yank \
