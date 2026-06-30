@@ -9,9 +9,22 @@ final class PasteServiceTests: XCTestCase {
         return try ModelContainer(for: ClipItem.self, configurations: config)
     }
 
+    private func makeTestPasteboard() -> NSPasteboard {
+        let prefix = "com.toku345.Yank.tests.PasteServiceTests"
+        let name = NSPasteboard.Name("\(prefix).\(UUID().uuidString)")
+        let pasteboard = NSPasteboard(name: name)
+        pasteboard.clearContents()
+        addTeardownBlock {
+            pasteboard.clearContents()
+            pasteboard.releaseGlobally()
+        }
+        return pasteboard
+    }
+
     func testWriteToPasteboard_withStringValue_writesString() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
+        let pasteboard = makeTestPasteboard()
 
         let item = ClipItem(
             title: "Plain",
@@ -22,15 +35,16 @@ final class PasteServiceTests: XCTestCase {
         context.insert(item)
         try context.save()
 
-        let result = PasteService.writeToPasteboard(item: item)
+        let result = PasteService.writeToPasteboard(item: item, pasteboard: pasteboard)
 
         XCTAssertTrue(result)
-        XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Hello, original!")
+        XCTAssertEqual(pasteboard.string(forType: .string), "Hello, original!")
     }
 
     func testWritePlainText_withStringValue_writesStringOnly() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
+        let pasteboard = makeTestPasteboard()
 
         let item = ClipItem(
             title: "Rich text",
@@ -42,10 +56,9 @@ final class PasteServiceTests: XCTestCase {
         context.insert(item)
         try context.save()
 
-        let result = PasteService.writePlainTextToPasteboard(item: item)
+        let result = PasteService.writePlainTextToPasteboard(item: item, pasteboard: pasteboard)
 
         XCTAssertTrue(result)
-        let pasteboard = NSPasteboard.general
         XCTAssertEqual(pasteboard.string(forType: .string), "Hello, world!")
         // HTML type must not be present
         XCTAssertNil(pasteboard.data(forType: .html))
@@ -54,6 +67,7 @@ final class PasteServiceTests: XCTestCase {
     func testWritePlainText_withFileURLsOnly_writesPathString() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
+        let pasteboard = makeTestPasteboard()
 
         let item = ClipItem(
             title: "[File: test.txt]",
@@ -64,17 +78,15 @@ final class PasteServiceTests: XCTestCase {
         context.insert(item)
         try context.save()
 
-        let result = PasteService.writePlainTextToPasteboard(item: item)
+        let result = PasteService.writePlainTextToPasteboard(item: item, pasteboard: pasteboard)
 
         XCTAssertTrue(result)
-        let pasteboard = NSPasteboard.general
         XCTAssertEqual(pasteboard.string(forType: .string), "/Users/test/test.txt")
     }
 
     func testWritePlainText_withNoTextRepresentation_returnsFalse() throws {
         // Seed a sentinel so we can verify the clipboard is not wiped on failure.
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
+        let pasteboard = makeTestPasteboard()
         let sentinel = NSPasteboardItem()
         sentinel.setString("sentinel", forType: .string)
         pasteboard.writeObjects([sentinel])
@@ -91,7 +103,7 @@ final class PasteServiceTests: XCTestCase {
         context.insert(item)
         try context.save()
 
-        let result = PasteService.writePlainTextToPasteboard(item: item)
+        let result = PasteService.writePlainTextToPasteboard(item: item, pasteboard: pasteboard)
 
         XCTAssertFalse(result)
         XCTAssertEqual(pasteboard.string(forType: .string), "sentinel")
@@ -100,6 +112,7 @@ final class PasteServiceTests: XCTestCase {
     func testWritePlainText_withHTMLOnly_extractsPlainText() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
+        let pasteboard = makeTestPasteboard()
 
         let html = "<p>Hello, <b>world</b>!</p>"
         let item = ClipItem(
@@ -111,10 +124,9 @@ final class PasteServiceTests: XCTestCase {
         context.insert(item)
         try context.save()
 
-        let result = PasteService.writePlainTextToPasteboard(item: item)
+        let result = PasteService.writePlainTextToPasteboard(item: item, pasteboard: pasteboard)
 
         XCTAssertTrue(result)
-        let pasteboard = NSPasteboard.general
         let written = pasteboard.string(forType: .string) ?? ""
         XCTAssertTrue(written.contains("Hello"))
         XCTAssertTrue(written.contains("world"))
@@ -125,6 +137,7 @@ final class PasteServiceTests: XCTestCase {
     func testWritePlainText_withRTFOnly_extractsPlainText() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
+        let pasteboard = makeTestPasteboard()
 
         let rtf = "{\\rtf1\\ansi Hello RTF}"
         let item = ClipItem(
@@ -136,10 +149,9 @@ final class PasteServiceTests: XCTestCase {
         context.insert(item)
         try context.save()
 
-        let result = PasteService.writePlainTextToPasteboard(item: item)
+        let result = PasteService.writePlainTextToPasteboard(item: item, pasteboard: pasteboard)
 
         XCTAssertTrue(result)
-        let pasteboard = NSPasteboard.general
         XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Hello RTF"))
         XCTAssertNil(pasteboard.data(forType: .rtf))
     }

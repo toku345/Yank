@@ -6,7 +6,7 @@ enum PasteService {
     private static let logger = Logger(subsystem: "com.toku345.Yank", category: "PasteService")
 
     @discardableResult
-    static func writeToPasteboard(item: ClipItem) -> Bool {
+    static func writeToPasteboard(item: ClipItem, pasteboard: NSPasteboard = .general) -> Bool {
         // Use NSPasteboardItem (modern API) exclusively.
         // Apple SDK: "declareTypes should not be used with writeObjects"
         let pbItem = NSPasteboardItem()
@@ -31,7 +31,7 @@ enum PasteService {
             objects.append(contentsOf: nsurls)
         }
 
-        guard writePreservingOnFailure(objects, to: .general) else {
+        guard writePreservingOnFailure(objects, to: pasteboard) else {
             logger.error("writeObjects failed; restored snapshot for: \(item.title, privacy: .private)")
             return false
         }
@@ -40,7 +40,7 @@ enum PasteService {
     }
 
     @discardableResult
-    static func writePlainTextToPasteboard(item: ClipItem) -> Bool {
+    static func writePlainTextToPasteboard(item: ClipItem, pasteboard: NSPasteboard = .general) -> Bool {
         // Derive text BEFORE touching the pasteboard so a validation failure
         // leaves the user's existing clipboard intact.
         guard let textValue = derivePlainText(from: item) else {
@@ -53,7 +53,7 @@ enum PasteService {
         // Self-paste suppression marker (ADR 0002)
         pbItem.setString("", forType: .fromYank)
 
-        guard writePreservingOnFailure([pbItem], to: .general) else {
+        guard writePreservingOnFailure([pbItem], to: pasteboard) else {
             logger.error("writePlainTextToPasteboard failed; restored snapshot for: \(item.title, privacy: .private)")
             return false
         }

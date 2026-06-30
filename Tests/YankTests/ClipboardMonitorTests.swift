@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 import SwiftData
 @testable import Yank
 
@@ -8,6 +9,24 @@ final class ClipboardMonitorTests: XCTestCase {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: ClipItem.self, configurations: config)
         return ModelContext(container)
+    }
+
+    private func makeTestPasteboard() -> NSPasteboard {
+        let prefix = "com.toku345.Yank.tests.ClipboardMonitorTests"
+        let name = NSPasteboard.Name("\(prefix).\(UUID().uuidString)")
+        let pasteboard = NSPasteboard(name: name)
+        pasteboard.clearContents()
+        return pasteboard
+    }
+
+    private func releaseTestPasteboard(_ pasteboard: NSPasteboard) {
+        pasteboard.clearContents()
+        pasteboard.releaseGlobally()
+    }
+
+    private func writeString(_ value: String, to pasteboard: NSPasteboard) {
+        pasteboard.declareTypes([.string], owner: nil)
+        XCTAssertTrue(pasteboard.setString(value, forType: .string))
     }
 
     private func waitForClipboardPoll(description: String = "wait for poll") {
@@ -20,16 +39,15 @@ final class ClipboardMonitorTests: XCTestCase {
 
     func testCapturesClipboardChange() throws {
         let context = try makeContext()
-        let monitor = ClipboardMonitor(modelContext: context)
+        let pasteboard = makeTestPasteboard()
+        let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
         monitor.start()
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
         addTeardownBlock {
             monitor.stop()
-            pasteboard.clearContents()
+            self.releaseTestPasteboard(pasteboard)
         }
-        pasteboard.setString("test capture", forType: .string)
+        writeString("test capture", to: pasteboard)
 
         waitForClipboardPoll(description: "clip captured")
 
@@ -41,15 +59,14 @@ final class ClipboardMonitorTests: XCTestCase {
 
     func testIgnoresSelfPaste() throws {
         let context = try makeContext()
-        let monitor = ClipboardMonitor(modelContext: context)
+        let pasteboard = makeTestPasteboard()
+        let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
         monitor.start()
 
         // Simulate PasteService: write with .fromYank marker
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
         addTeardownBlock {
             monitor.stop()
-            pasteboard.clearContents()
+            self.releaseTestPasteboard(pasteboard)
         }
         pasteboard.declareTypes([.string, .fromYank], owner: nil)
         pasteboard.setString("self-pasted content", forType: .string)
@@ -76,18 +93,17 @@ final class ClipboardMonitorTests: XCTestCase {
         for markerRawValue in expectedMarkerRawValues {
             let marker = NSPasteboard.PasteboardType(markerRawValue)
             let context = try makeContext()
-            let monitor = ClipboardMonitor(modelContext: context)
+            let pasteboard = makeTestPasteboard()
+            let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
             monitor.start()
 
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
             defer {
                 monitor.stop()
-                pasteboard.clearContents()
+                releaseTestPasteboard(pasteboard)
             }
 
             let unmarkedValue = "unmarked content \(marker.rawValue)"
-            XCTAssertTrue(pasteboard.setString(unmarkedValue, forType: .string))
+            writeString(unmarkedValue, to: pasteboard)
             waitForClipboardPoll(description: "capture control \(marker.rawValue)")
 
             var items = try context.fetch(FetchDescriptor<ClipItem>())
@@ -118,25 +134,24 @@ final class ClipboardMonitorTests: XCTestCase {
 
     func testPrunesOldestItemsWhenHistoryLimitIsExceeded() throws {
         let context = try makeContext()
-        let monitor = ClipboardMonitor(modelContext: context, historyLimit: 2)
+        let pasteboard = makeTestPasteboard()
+        let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard, historyLimit: 2)
         monitor.start()
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
         addTeardownBlock {
             monitor.stop()
-            pasteboard.clearContents()
+            self.releaseTestPasteboard(pasteboard)
         }
 
-        XCTAssertTrue(pasteboard.setString("oldest item", forType: .string))
+        writeString("oldest item", to: pasteboard)
         waitForClipboardPoll(description: "oldest captured")
 
         pasteboard.clearContents()
-        XCTAssertTrue(pasteboard.setString("middle item", forType: .string))
+        writeString("middle item", to: pasteboard)
         waitForClipboardPoll(description: "middle captured")
 
         pasteboard.clearContents()
-        XCTAssertTrue(pasteboard.setString("newest item", forType: .string))
+        writeString("newest item", to: pasteboard)
         waitForClipboardPoll(description: "newest captured")
 
         let descriptor = FetchDescriptor<ClipItem>(
@@ -165,21 +180,21 @@ final class ClipboardMonitorTests: XCTestCase {
         }
         try context.save()
 
+        let pasteboard = makeTestPasteboard()
         let monitor = ClipboardMonitor(
             modelContext: context,
+            pasteboard: pasteboard,
             historyLimit: 2,
             historyPruneBatchSize: 2
         )
         monitor.start()
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
         addTeardownBlock {
             monitor.stop()
-            pasteboard.clearContents()
+            self.releaseTestPasteboard(pasteboard)
         }
 
-        XCTAssertTrue(pasteboard.setString("trigger item", forType: .string))
+        writeString("trigger item", to: pasteboard)
         waitForClipboardPoll(description: "trigger captured")
         waitForClipboardPoll(description: "prune continuations completed")
 
@@ -209,22 +224,22 @@ final class ClipboardMonitorTests: XCTestCase {
         }
         try context.save()
 
+        let pasteboard = makeTestPasteboard()
         let monitor = ClipboardMonitor(
             modelContext: context,
+            pasteboard: pasteboard,
             historyLimit: 2,
             historyPruneBatchSize: 2,
             historyPruneContinuationDelay: 60
         )
         monitor.start()
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
         addTeardownBlock {
             monitor.stop()
-            pasteboard.clearContents()
+            self.releaseTestPasteboard(pasteboard)
         }
 
-        XCTAssertTrue(pasteboard.setString("trigger item", forType: .string))
+        writeString("trigger item", to: pasteboard)
         waitForClipboardPoll(description: "trigger captured")
 
         let descriptor = FetchDescriptor<ClipItem>(
