@@ -38,3 +38,5 @@ SupportingFiles/Local.xcconfig
 
 # Agent tooling (machine-specific)
 .codex/
+.claude/settings.local.json
+.claude/.cc-writes/
