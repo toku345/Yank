@@ -27,6 +27,9 @@ Package.resolved
 SupportingFiles/Info.plist
 SupportingFiles/Yank.entitlements
 
+# Per-developer signing overrides (issue #11)
+SupportingFiles/Local.xcconfig
+
 # direnv
 .envrc
 

@@ -48,7 +48,7 @@ open ~/Library/Developer/Xcode/DerivedData/Yank-*/Build/Products/Debug/Yank.app
 
 On first launch, macOS will prompt for **Accessibility permission** (required for paste simulation via Cmd+V). Grant it in **System Settings > Privacy & Security > Accessibility**.
 
-> **Note:** Each debug build changes the binary, which may invalidate the Accessibility permission grant. If paste stops working, remove Yank from the Accessibility list and re-add it.
+> **Note:** With the default ad-hoc signing, each debug build changes the code signature and macOS revokes the Accessibility grant. Set up a stable development signing identity (see [docs/dev-signing.md](docs/dev-signing.md)) to keep the permission across builds. If paste still stops working, remove Yank from the Accessibility list and re-add it.
 
 ### Keybindings
 

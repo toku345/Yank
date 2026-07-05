@@ -1,0 +1,4 @@
+// Shared base build settings for all targets.
+// Per-developer overrides live in Local.xcconfig (gitignored, optional).
+// Without it, builds fall back to ad-hoc signing (CI uses this path).
+#include? "Local.xcconfig"
