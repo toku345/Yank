@@ -49,7 +49,8 @@ private struct HistoryPruneProgress {
 
 @MainActor
 final class ClipboardMonitor {
-    private let pasteboard: NSPasteboard
+    // Exposed (internal) so tests can assert the injected default is `.general`.
+    let pasteboard: NSPasteboard
     private var lastChangeCount: Int
     private var timer: Timer?
     private let modelContext: ModelContext

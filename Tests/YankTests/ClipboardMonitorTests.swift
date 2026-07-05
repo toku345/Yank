@@ -24,6 +24,14 @@ final class ClipboardMonitorTests: XCTestCase {
         wait(for: [expectation], timeout: 1.0)
     }
 
+    // Guards the production default: AppCoordinator constructs ClipboardMonitor
+    // without a pasteboard argument, so capture must target .general. No start()
+    // call — this only inspects the injected reference, so it has no side effects.
+    func testUsesGeneralPasteboardByDefault() throws {
+        let monitor = ClipboardMonitor(modelContext: try makeContext())
+        XCTAssertTrue(monitor.pasteboard === NSPasteboard.general)
+    }
+
     func testCapturesClipboardChange() throws {
         let context = try makeContext()
         let pasteboard = makeTestPasteboard()
