@@ -9,18 +9,6 @@ final class PasteServiceTests: XCTestCase {
         return try ModelContainer(for: ClipItem.self, configurations: config)
     }
 
-    private func makeTestPasteboard() -> NSPasteboard {
-        let prefix = "com.toku345.Yank.tests.PasteServiceTests"
-        let name = NSPasteboard.Name("\(prefix).\(UUID().uuidString)")
-        let pasteboard = NSPasteboard(name: name)
-        pasteboard.clearContents()
-        addTeardownBlock {
-            pasteboard.clearContents()
-            pasteboard.releaseGlobally()
-        }
-        return pasteboard
-    }
-
     func testWriteToPasteboard_withStringValue_writesString() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

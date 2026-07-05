@@ -11,19 +11,6 @@ final class ClipboardMonitorTests: XCTestCase {
         return ModelContext(container)
     }
 
-    private func makeTestPasteboard() -> NSPasteboard {
-        let prefix = "com.toku345.Yank.tests.ClipboardMonitorTests"
-        let name = NSPasteboard.Name("\(prefix).\(UUID().uuidString)")
-        let pasteboard = NSPasteboard(name: name)
-        pasteboard.clearContents()
-        return pasteboard
-    }
-
-    private func releaseTestPasteboard(_ pasteboard: NSPasteboard) {
-        pasteboard.clearContents()
-        pasteboard.releaseGlobally()
-    }
-
     private func writeString(_ value: String, to pasteboard: NSPasteboard) {
         pasteboard.declareTypes([.string], owner: nil)
         XCTAssertTrue(pasteboard.setString(value, forType: .string))
@@ -43,10 +30,7 @@ final class ClipboardMonitorTests: XCTestCase {
         let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
         monitor.start()
 
-        addTeardownBlock {
-            monitor.stop()
-            self.releaseTestPasteboard(pasteboard)
-        }
+        addTeardownBlock { monitor.stop() }
         writeString("test capture", to: pasteboard)
 
         waitForClipboardPoll(description: "clip captured")
@@ -64,10 +48,7 @@ final class ClipboardMonitorTests: XCTestCase {
         monitor.start()
 
         // Simulate PasteService: write with .fromYank marker
-        addTeardownBlock {
-            monitor.stop()
-            self.releaseTestPasteboard(pasteboard)
-        }
+        addTeardownBlock { monitor.stop() }
         pasteboard.declareTypes([.string, .fromYank], owner: nil)
         pasteboard.setString("self-pasted content", forType: .string)
         pasteboard.setString("", forType: .fromYank)
@@ -97,10 +78,7 @@ final class ClipboardMonitorTests: XCTestCase {
             let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
             monitor.start()
 
-            defer {
-                monitor.stop()
-                releaseTestPasteboard(pasteboard)
-            }
+            defer { monitor.stop() }
 
             let unmarkedValue = "unmarked content \(marker.rawValue)"
             writeString(unmarkedValue, to: pasteboard)
@@ -138,10 +116,7 @@ final class ClipboardMonitorTests: XCTestCase {
         let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard, historyLimit: 2)
         monitor.start()
 
-        addTeardownBlock {
-            monitor.stop()
-            self.releaseTestPasteboard(pasteboard)
-        }
+        addTeardownBlock { monitor.stop() }
 
         writeString("oldest item", to: pasteboard)
         waitForClipboardPoll(description: "oldest captured")
@@ -189,10 +164,7 @@ final class ClipboardMonitorTests: XCTestCase {
         )
         monitor.start()
 
-        addTeardownBlock {
-            monitor.stop()
-            self.releaseTestPasteboard(pasteboard)
-        }
+        addTeardownBlock { monitor.stop() }
 
         writeString("trigger item", to: pasteboard)
         waitForClipboardPoll(description: "trigger captured")
@@ -234,10 +206,7 @@ final class ClipboardMonitorTests: XCTestCase {
         )
         monitor.start()
 
-        addTeardownBlock {
-            monitor.stop()
-            self.releaseTestPasteboard(pasteboard)
-        }
+        addTeardownBlock { monitor.stop() }
 
         writeString("trigger item", to: pasteboard)
         waitForClipboardPoll(description: "trigger captured")
