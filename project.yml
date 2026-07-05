@@ -12,6 +12,11 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 
+# 開発者ごとの署名設定の注入口 (issue #11 / ADR 0007)。
+# Debug 限定: 個人の開発証明書を Release/archive に波及させない。
+configFiles:
+  Debug: SupportingFiles/Base.xcconfig
+
 targets:
   Yank:
     type: application
