@@ -94,7 +94,7 @@ CI 関連の注意:
 
 ## macOS / AppKit Pitfalls
 
-- Accessibility 権限は debug build ごとに無効化されることがあります。UI 上はチェック済みでも `AXIsProcessTrusted()` が `false` を返し、`CGEvent.post` は黙って失敗します。ペーストが効かない場合は「システム設定 -> アクセシビリティ」から Yank を削除して再追加します。
+- Accessibility 権限は ad-hoc 署名だと debug build ごとに無効化されます (designated requirement が cdhash ベースになるため)。`SupportingFiles/Local.xcconfig` に開発用署名を設定すると権限が維持されます。セットアップは `docs/dev-signing.md` を参照。それでもペーストが効かない場合は「システム設定 -> アクセシビリティ」から Yank を削除して再追加します。
 - SwiftData の `ModelConfiguration("Yank")` は `~/Library/Application Support/Yank.store` を作ります。スキーマ変更時は `rm -f ~/Library/Application\ Support/Yank.store*` で削除します。
 - worktree ごとに DerivedData パスが異なります。手動起動時は `open` に full path を指定します。
 - `NSPasteboard` は classic API (`declareTypes` / `setString` / `setData`) と modern API (`writeObjects`) を混用しないでください。`NSPasteboardItem` + `writeObjects` に寄せます。
