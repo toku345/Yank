@@ -49,7 +49,8 @@ private struct HistoryPruneProgress {
 
 @MainActor
 final class ClipboardMonitor {
-    private let pasteboard = NSPasteboard.general
+    // Exposed (internal) so tests can assert the injected default is `.general`.
+    let pasteboard: NSPasteboard
     private var lastChangeCount: Int
     private var timer: Timer?
     private let modelContext: ModelContext
@@ -63,11 +64,13 @@ final class ClipboardMonitor {
 
     init(
         modelContext: ModelContext,
+        pasteboard: NSPasteboard = .general,
         historyLimit: Int = ClipboardHistoryPolicy.defaultLimit,
         historyPruneBatchSize: Int = ClipboardHistoryPolicy.pruneBatchSize,
         historyPruneContinuationDelay: TimeInterval = ClipboardHistoryPolicy.pruneContinuationDelay
     ) {
         self.modelContext = modelContext
+        self.pasteboard = pasteboard
         self.historyLimit = max(1, historyLimit)
         self.historyPruneBatchSize = max(1, historyPruneBatchSize)
         self.historyPruneContinuationDelay = max(0, historyPruneContinuationDelay)
