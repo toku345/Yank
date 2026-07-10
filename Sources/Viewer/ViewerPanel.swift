@@ -63,14 +63,20 @@ final class ViewerPanelController {
     private var panel: ViewerPanel?
     private let modelContainer: ModelContainer
     private let viewerState: ViewerState
+    private let clearHistory: @MainActor () async throws -> Void
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "ViewerPanelController")
 
     var onPaste: ((ClipItem, PasteFormat) -> Void)?
     var onClose: (() -> Void)?
 
-    init(modelContainer: ModelContainer, viewerState: ViewerState) {
+    init(
+        modelContainer: ModelContainer,
+        viewerState: ViewerState,
+        onClearHistory: @escaping @MainActor () async throws -> Void
+    ) {
         self.modelContainer = modelContainer
         self.viewerState = viewerState
+        self.clearHistory = onClearHistory
     }
 
     func toggle() {
@@ -86,7 +92,11 @@ final class ViewerPanelController {
             let contentView = ViewerContentView(
                 viewerState: viewerState,
                 onPaste: { [weak self] item, format in self?.onPaste?(item, format) },
-                onClose: { [weak self] in self?.onClose?() }
+                onClose: { [weak self] in self?.onClose?() },
+                onClearHistory: { [weak self] in
+                    guard let self else { return }
+                    try await self.clearHistory()
+                }
             )
             let hostingView = NSHostingView(
                 rootView: contentView.modelContainer(modelContainer)

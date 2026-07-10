@@ -15,9 +15,11 @@ struct ViewerContentView: View {
     private var clipItems: [ClipItem]
 
     let viewerState: ViewerState
+    @State private var isClearingHistory = false
 
     let onPaste: (ClipItem, PasteFormat) -> Void
     let onClose: () -> Void
+    let onClearHistory: @MainActor () async throws -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,7 +41,8 @@ struct ViewerContentView: View {
             Divider()
             HistoryControls(
                 viewerState: viewerState,
-                hasItems: !clipItems.isEmpty
+                hasItems: !clipItems.isEmpty,
+                isClearingHistory: isClearingHistory
             )
         }
         .frame(minWidth: 350, idealWidth: 400, minHeight: 300, idealHeight: 500)
@@ -59,20 +62,21 @@ struct ViewerContentView: View {
     private struct HistoryControls: View {
         @Bindable var viewerState: ViewerState
         let hasItems: Bool
+        let isClearingHistory: Bool
 
         var body: some View {
             HStack {
                 Button("Delete Selected") {
                     viewerState.perform(.deleteSelected)
                 }
-                .disabled(viewerState.selectedID == nil)
+                .disabled(viewerState.selectedID == nil || isClearingHistory)
 
                 Spacer()
 
                 Button("Clear All", role: .destructive) {
                     viewerState.perform(.clearHistory)
                 }
-                .disabled(!hasItems)
+                .disabled(!hasItems || isClearingHistory)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -87,35 +91,45 @@ struct ViewerContentView: View {
                 onPaste(item, format)
             }
         case .deleteSelected:
-            do {
-                let result = try HistoryDeletion.deleteSelectedItem(
-                    from: clipItems,
-                    in: modelContext,
-                    viewerState: viewerState
-                )
-                if case .selectedItemMissing(let id) = result {
-                    Self.logger.warning(
-                        "Delete skipped because selected item was missing: \(String(describing: id), privacy: .public)"
-                    )
-                }
-            } catch {
-                reportDeletionFailure(operation: "delete the selected item", error: error)
-            }
+            deleteSelectedItem()
         case .clearHistory:
-            do {
-                try HistoryDeletion.clearAllIfConfirmed(
-                    items: clipItems,
-                    in: modelContext,
-                    viewerState: viewerState,
-                    confirmClearAll: { confirmClearAll() }
-                )
-            } catch {
-                reportDeletionFailure(operation: "clear clipboard history", error: error)
-            }
+            beginClearingHistory()
         case .close:
             onClose()
         case .move, .jumpToStart, .jumpToEnd:
             break
+        }
+    }
+
+    private func deleteSelectedItem() {
+        guard !isClearingHistory else { return }
+        do {
+            let result = try HistoryDeletion.deleteSelectedItem(
+                from: clipItems,
+                in: modelContext,
+                viewerState: viewerState
+            )
+            if case .selectedItemMissing(let id) = result {
+                Self.logger.warning(
+                    "Delete skipped because selected item was missing: \(String(describing: id), privacy: .public)"
+                )
+            }
+        } catch {
+            reportDeletionFailure(operation: "delete the selected item", error: error)
+        }
+    }
+
+    private func beginClearingHistory() {
+        guard !isClearingHistory, confirmClearAll() else { return }
+        isClearingHistory = true
+        Task { @MainActor in
+            defer { isClearingHistory = false }
+            do {
+                try await onClearHistory()
+                viewerState.clearItems()
+            } catch {
+                reportDeletionFailure(operation: "clear clipboard history", error: error)
+            }
         }
     }
 
@@ -183,37 +197,6 @@ enum HistoryDeletion {
         try saveOrRollback(in: modelContext, saveChanges: saveChanges)
         viewerState.removeItem(id: selectedID)
         return .deleted
-    }
-
-    @discardableResult
-    static func clearAllIfConfirmed(
-        items: [ClipItem],
-        in modelContext: ModelContext,
-        viewerState: ViewerState,
-        confirmClearAll: () -> Bool,
-        saveChanges: SaveChanges = { try $0.save() }
-    ) throws -> Bool {
-        guard confirmClearAll() else { return false }
-        try clearAll(
-            items: items,
-            in: modelContext,
-            viewerState: viewerState,
-            saveChanges: saveChanges
-        )
-        return true
-    }
-
-    private static func clearAll(
-        items: [ClipItem],
-        in modelContext: ModelContext,
-        viewerState: ViewerState,
-        saveChanges: SaveChanges = { try $0.save() }
-    ) throws {
-        for item in items {
-            modelContext.delete(item)
-        }
-        try saveOrRollback(in: modelContext, saveChanges: saveChanges)
-        viewerState.clearItems()
     }
 
     private static func saveOrRollback(
