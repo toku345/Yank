@@ -3,12 +3,37 @@ import AppKit
 import SwiftData
 @testable import Yank
 
+private actor PersistenceGate {
+    private var snapshots: [PasteboardSnapshot] = []
+    private var firstContinuation: CheckedContinuation<Void, Never>?
+    private var firstReleased = false
+
+    func persist(_ snapshot: PasteboardSnapshot) async -> ClipboardPersistenceResult {
+        snapshots.append(snapshot)
+        if snapshots.count == 1 && !firstReleased {
+            await withCheckedContinuation { continuation in
+                firstContinuation = continuation
+            }
+        }
+        return .saved(prunedCount: 0)
+    }
+
+    func releaseFirst() {
+        firstReleased = true
+        firstContinuation?.resume()
+        firstContinuation = nil
+    }
+
+    func values() -> [String?] {
+        snapshots.map(\.stringValue)
+    }
+}
+
 @MainActor
 final class ClipboardMonitorTests: XCTestCase {
-    private func makeContext() throws -> ModelContext {
+    private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: ClipItem.self, configurations: config)
-        return ModelContext(container)
+        return try ModelContainer(for: ClipItem.self, configurations: config)
     }
 
     private func writeString(_ value: String, to pasteboard: NSPasteboard) {
@@ -24,18 +49,26 @@ final class ClipboardMonitorTests: XCTestCase {
         wait(for: [expectation], timeout: 1.0)
     }
 
+    private func waitForPersistenceCount(_ expectedCount: Int, gate: PersistenceGate) async {
+        for _ in 0..<100 {
+            if await gate.values().count >= expectedCount { return }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("Timed out waiting for \(expectedCount) persistence calls")
+    }
+
     // Guards the production default: AppCoordinator constructs ClipboardMonitor
     // without a pasteboard argument, so capture must target .general. No start()
-    // call — this only inspects the injected reference, so it has no side effects.
+    // call -- this only inspects the injected reference, so it has no side effects.
     func testUsesGeneralPasteboardByDefault() throws {
-        let monitor = ClipboardMonitor(modelContext: try makeContext())
+        let monitor = ClipboardMonitor(modelContainer: try makeContainer())
         XCTAssertTrue(monitor.pasteboard === NSPasteboard.general)
     }
 
     func testCapturesClipboardChange() throws {
-        let context = try makeContext()
+        let container = try makeContainer()
         let pasteboard = makeTestPasteboard()
-        let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
+        let monitor = ClipboardMonitor(modelContainer: container, pasteboard: pasteboard)
         monitor.start()
 
         addTeardownBlock { monitor.stop() }
@@ -43,16 +76,16 @@ final class ClipboardMonitorTests: XCTestCase {
 
         waitForClipboardPoll(description: "clip captured")
 
-        let items = try context.fetch(FetchDescriptor<ClipItem>())
+        let items = try ModelContext(container).fetch(FetchDescriptor<ClipItem>())
         let captured = items.first(where: { $0.stringValue == "test capture" })
         XCTAssertNotNil(captured)
         XCTAssertEqual(captured?.stringValue, "test capture")
     }
 
     func testIgnoresSelfPaste() throws {
-        let context = try makeContext()
+        let container = try makeContainer()
         let pasteboard = makeTestPasteboard()
-        let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
+        let monitor = ClipboardMonitor(modelContainer: container, pasteboard: pasteboard)
         monitor.start()
 
         // Simulate PasteService: write with .fromYank marker
@@ -63,7 +96,7 @@ final class ClipboardMonitorTests: XCTestCase {
 
         waitForClipboardPoll()
 
-        let items = try context.fetch(FetchDescriptor<ClipItem>())
+        let items = try ModelContext(container).fetch(FetchDescriptor<ClipItem>())
         let selfPasted = items.first(where: { $0.stringValue == "self-pasted content" })
         XCTAssertNil(selfPasted, "Self-pasted content should not be captured")
     }
@@ -81,9 +114,9 @@ final class ClipboardMonitorTests: XCTestCase {
 
         for markerRawValue in expectedMarkerRawValues {
             let marker = NSPasteboard.PasteboardType(markerRawValue)
-            let context = try makeContext()
+            let container = try makeContainer()
             let pasteboard = makeTestPasteboard()
-            let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard)
+            let monitor = ClipboardMonitor(modelContainer: container, pasteboard: pasteboard)
             monitor.start()
 
             defer { monitor.stop() }
@@ -92,7 +125,7 @@ final class ClipboardMonitorTests: XCTestCase {
             writeString(unmarkedValue, to: pasteboard)
             waitForClipboardPoll(description: "capture control \(marker.rawValue)")
 
-            var items = try context.fetch(FetchDescriptor<ClipItem>())
+            var items = try ModelContext(container).fetch(FetchDescriptor<ClipItem>())
             let unmarked = items.first(where: { $0.stringValue == unmarkedValue })
             XCTAssertNotNil(unmarked, "Unmarked content should be captured: \(marker.rawValue)")
             let itemCountAfterUnmarkedCapture = items.count
@@ -107,7 +140,7 @@ final class ClipboardMonitorTests: XCTestCase {
 
             waitForClipboardPoll(description: "skip marker \(marker.rawValue)")
 
-            items = try context.fetch(FetchDescriptor<ClipItem>())
+            items = try ModelContext(container).fetch(FetchDescriptor<ClipItem>())
             let captured = items.first(where: { $0.stringValue == value })
             XCTAssertNil(captured, "Marked content should not be captured: \(marker.rawValue)")
             XCTAssertEqual(
@@ -119,9 +152,9 @@ final class ClipboardMonitorTests: XCTestCase {
     }
 
     func testPrunesOldestItemsWhenHistoryLimitIsExceeded() throws {
-        let context = try makeContext()
+        let container = try makeContainer()
         let pasteboard = makeTestPasteboard()
-        let monitor = ClipboardMonitor(modelContext: context, pasteboard: pasteboard, historyLimit: 2)
+        let monitor = ClipboardMonitor(modelContainer: container, pasteboard: pasteboard, historyLimit: 2)
         monitor.start()
 
         addTeardownBlock { monitor.stop() }
@@ -140,7 +173,7 @@ final class ClipboardMonitorTests: XCTestCase {
         let descriptor = FetchDescriptor<ClipItem>(
             sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
         )
-        let items = try context.fetch(descriptor)
+        let items = try ModelContext(container).fetch(descriptor)
         let values = items.compactMap(\.stringValue)
 
         XCTAssertEqual(items.count, 2)
@@ -149,11 +182,12 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertFalse(values.contains("oldest item"))
     }
 
-    func testPrunesSeededOverflowItemsAcrossBatches() throws {
-        let context = try makeContext()
+    func testPrunesAllSeededOverflowItemsAfterCapture() throws {
+        let container = try makeContainer()
+        let seedContext = ModelContext(container)
         let seededDate = Date(timeIntervalSinceNow: -1_000)
         for index in 0..<7 {
-            context.insert(ClipItem(
+            seedContext.insert(ClipItem(
                 title: "seed \(index)",
                 primaryType: NSPasteboard.PasteboardType.string.rawValue,
                 availableTypes: [NSPasteboard.PasteboardType.string.rawValue],
@@ -161,27 +195,24 @@ final class ClipboardMonitorTests: XCTestCase {
                 createdAt: seededDate.addingTimeInterval(TimeInterval(index))
             ))
         }
-        try context.save()
+        try seedContext.save()
 
         let pasteboard = makeTestPasteboard()
         let monitor = ClipboardMonitor(
-            modelContext: context,
+            modelContainer: container,
             pasteboard: pasteboard,
-            historyLimit: 2,
-            historyPruneBatchSize: 2
+            historyLimit: 2
         )
         monitor.start()
 
         addTeardownBlock { monitor.stop() }
-
         writeString("trigger item", to: pasteboard)
-        waitForClipboardPoll(description: "trigger captured")
-        waitForClipboardPoll(description: "prune continuations completed")
+        waitForClipboardPoll(description: "trigger captured and overflow pruned")
 
         let descriptor = FetchDescriptor<ClipItem>(
             sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
         )
-        let items = try context.fetch(descriptor)
+        let items = try ModelContext(container).fetch(descriptor)
         let values = items.compactMap(\.stringValue)
 
         XCTAssertEqual(items.count, 2)
@@ -190,46 +221,31 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertFalse(values.contains("seed 0"))
     }
 
-    func testPrunesOnlyOneBatchDuringCaptureWhenContinuationIsDelayed() throws {
-        let context = try makeContext()
-        let seededDate = Date(timeIntervalSinceNow: -1_000)
-        for index in 0..<7 {
-            context.insert(ClipItem(
-                title: "seed \(index)",
-                primaryType: NSPasteboard.PasteboardType.string.rawValue,
-                availableTypes: [NSPasteboard.PasteboardType.string.rawValue],
-                stringValue: "seed \(index)",
-                createdAt: seededDate.addingTimeInterval(TimeInterval(index))
-            ))
-        }
-        try context.save()
-
+    func testBusyPollLeavesChangePendingAndRepollsAfterPersistence() async throws {
+        let container = try makeContainer()
         let pasteboard = makeTestPasteboard()
+        let gate = PersistenceGate()
         let monitor = ClipboardMonitor(
-            modelContext: context,
+            modelContainer: container,
             pasteboard: pasteboard,
-            historyLimit: 2,
-            historyPruneBatchSize: 2,
-            historyPruneContinuationDelay: 60
+            persistSnapshot: { snapshot in await gate.persist(snapshot) }
         )
         monitor.start()
-
         addTeardownBlock { monitor.stop() }
 
-        writeString("trigger item", to: pasteboard)
-        waitForClipboardPoll(description: "trigger captured")
+        writeString("first", to: pasteboard)
+        monitor.pollClipboard()
+        await waitForPersistenceCount(1, gate: gate)
 
-        let descriptor = FetchDescriptor<ClipItem>(
-            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
-        )
-        let items = try context.fetch(descriptor)
-        let values = items.compactMap(\.stringValue)
+        pasteboard.clearContents()
+        writeString("second", to: pasteboard)
+        monitor.pollClipboard()
+        var values = await gate.values()
+        XCTAssertEqual(values, ["first"])
 
-        XCTAssertEqual(items.count, 6)
-        XCTAssertTrue(values.contains("trigger item"))
-        XCTAssertTrue(values.contains("seed 6"))
-        XCTAssertTrue(values.contains("seed 0"))
-        XCTAssertFalse(values.contains("seed 5"))
-        XCTAssertFalse(values.contains("seed 4"))
+        await gate.releaseFirst()
+        await waitForPersistenceCount(2, gate: gate)
+        values = await gate.values()
+        XCTAssertEqual(values, ["first", "second"])
     }
 }

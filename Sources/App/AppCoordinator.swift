@@ -27,9 +27,7 @@ final class AppCoordinator {
         modelContainer = container
         hardenStoreFamily()
 
-        let context = ModelContext(container)
-
-        let monitor = ClipboardMonitor(modelContext: context)
+        let monitor = ClipboardMonitor(modelContainer: container)
         monitor.start()
         clipboardMonitor = monitor
 
