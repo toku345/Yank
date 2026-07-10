@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 import os.log
 
 enum ClipboardHistoryPolicy {
@@ -91,7 +92,7 @@ actor ClipboardHistoryWriter {
         let fingerprint = snapshot.fingerprint
         guard fingerprint != lastPersistedFingerprint else { return .duplicate }
 
-        let title = ClipboardMonitor.deriveTitle(
+        let title = Self.deriveTitle(
             stringValue: snapshot.stringValue,
             availableTypes: snapshot.availableTypes,
             fileURLs: snapshot.fileURLs
@@ -125,6 +126,31 @@ actor ClipboardHistoryWriter {
             )
             throw error
         }
+    }
+
+    static func deriveTitle(
+        stringValue: String?,
+        availableTypes: [String],
+        fileURLs: [String]?
+    ) -> String {
+        if let text = stringValue, !text.isEmpty {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return String(trimmed.prefix(50))
+            }
+        }
+        if let urls = fileURLs, let first = urls.first {
+            return "[File: \(URL(string: first)?.lastPathComponent ?? first)]"
+        }
+        // Scan all available types, not just the first one. The leading type can
+        // be an Apple-internal identifier that UTType does not resolve.
+        let uttypes = availableTypes.compactMap { UTType($0) }
+        if uttypes.contains(where: { $0.conforms(to: .image) }) { return "[Image]" }
+        if uttypes.contains(where: { $0.conforms(to: .pdf) }) { return "[PDF]" }
+        if uttypes.contains(where: { $0.conforms(to: .rtfd) }) { return "[RTFD]" }
+        if uttypes.contains(where: { $0.conforms(to: .rtf) }) { return "[RTF]" }
+        if uttypes.contains(where: { $0.conforms(to: .html) }) { return "[HTML]" }
+        return "[Clipboard Data]"
     }
 
     private func persistenceContext() -> ModelContext {

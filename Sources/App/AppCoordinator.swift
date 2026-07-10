@@ -32,7 +32,6 @@ final class AppCoordinator {
         clipboardHistoryWriter = writer
 
         let monitor = ClipboardMonitor(
-            modelContainer: container,
             persistSnapshot: { snapshot in await writer.persist(snapshot) }
         )
         monitor.start()

@@ -102,11 +102,11 @@ final class ClipboardMonitorTests: XCTestCase {
         wait(for: [expectation], timeout: 1.0)
     }
 
-    // Guards the production default: AppCoordinator constructs ClipboardMonitor
-    // without a pasteboard argument, so capture must target .general. No start()
-    // call -- this only inspects the injected reference, so it has no side effects.
-    func testUsesGeneralPasteboardByDefault() throws {
-        let monitor = ClipboardMonitor(modelContainer: try makeContainer())
+    // Guards the production default: AppCoordinator injects persistence without
+    // a pasteboard argument, so capture must target .general. No start() call --
+    // this only inspects the injected reference, so it has no side effects.
+    func testUsesGeneralPasteboardByDefault() {
+        let monitor = ClipboardMonitor(persistSnapshot: { _ in .failed })
         XCTAssertTrue(monitor.pasteboard === NSPasteboard.general)
     }
 
@@ -266,8 +266,7 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertFalse(values.contains("seed 0"))
     }
 
-    func testBusyPollLeavesChangePendingAndRepollsAfterPersistence() async throws {
-        let container = try makeContainer()
+    func testBusyPollLeavesChangePendingAndRepollsAfterPersistence() async {
         let pasteboard = makeTestPasteboard()
         let firstStarted = expectation(description: "first persistence started")
         let secondStarted = expectation(description: "second persistence started")
@@ -276,7 +275,6 @@ final class ClipboardMonitorTests: XCTestCase {
             if count == 2 { secondStarted.fulfill() }
         }
         let monitor = ClipboardMonitor(
-            modelContainer: container,
             pasteboard: pasteboard,
             persistSnapshot: { snapshot in await gate.persist(snapshot) }
         )
@@ -317,7 +315,6 @@ final class ClipboardMonitorTests: XCTestCase {
         }
         let writer = ClipboardHistoryWriter(modelContainer: container)
         let monitor = ClipboardMonitor(
-            modelContainer: container,
             pasteboard: pasteboard,
             persistSnapshot: { snapshot in
                 await gate.waitBeforePersisting(snapshot)
@@ -352,7 +349,6 @@ final class ClipboardMonitorTests: XCTestCase {
     }
 
     func testClearHistoryFailureResumesAndCapturesPendingChange() async throws {
-        let container = try makeContainer()
         let pasteboard = makeTestPasteboard()
         let persistenceStarted = expectation(description: "pending change captured after clear failure")
         let gate = PersistenceGate { count in
@@ -360,7 +356,6 @@ final class ClipboardMonitorTests: XCTestCase {
         }
         await gate.releaseFirst()
         let monitor = ClipboardMonitor(
-            modelContainer: container,
             pasteboard: pasteboard,
             persistSnapshot: { snapshot in await gate.persist(snapshot) }
         )
@@ -392,7 +387,6 @@ final class ClipboardMonitorTests: XCTestCase {
         let events = EventRecorder()
         let writer = ClipboardHistoryWriter(modelContainer: container)
         let monitor = ClipboardMonitor(
-            modelContainer: container,
             pasteboard: pasteboard,
             persistSnapshot: { snapshot in
                 events.append("persist-start")

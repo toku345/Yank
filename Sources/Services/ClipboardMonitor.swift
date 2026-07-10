@@ -1,6 +1,5 @@
 import AppKit
 import SwiftData
-import UniformTypeIdentifiers
 import os.log
 
 private enum PasteboardReadResult {
@@ -31,29 +30,31 @@ final class ClipboardMonitor {
     private var persistenceTask: Task<Void, Never>?
     private var clearHistoryTask: Task<Void, Error>?
 
-    /// - Parameter historyLimit: Applies only to the default persistence path.
-    ///   When `persistSnapshot` is injected (tests), the built-in
-    ///   `ClipboardHistoryWriter` is not constructed and `historyLimit` is ignored;
-    ///   the injected closure owns any pruning behavior.
     init(
-        modelContainer: ModelContainer,
         pasteboard: NSPasteboard = .general,
-        historyLimit: Int = ClipboardHistoryPolicy.defaultLimit,
-        persistSnapshot: PersistSnapshot? = nil
+        persistSnapshot: @escaping PersistSnapshot
     ) {
         self.pasteboard = pasteboard
         self.lastChangeCount = pasteboard.changeCount
-        if let persistSnapshot {
-            self.persistSnapshot = persistSnapshot
-        } else {
-            let writer = ClipboardHistoryWriter(
-                modelContainer: modelContainer,
-                historyLimit: historyLimit
-            )
-            self.persistSnapshot = { snapshot in
-                await writer.persist(snapshot)
-            }
-        }
+        self.persistSnapshot = persistSnapshot
+    }
+
+    /// Creates a monitor backed by its own `ClipboardHistoryWriter`.
+    /// The injected-persistence initializer is used when the caller must share
+    /// a writer with other operations such as Clear All.
+    convenience init(
+        modelContainer: ModelContainer,
+        pasteboard: NSPasteboard = .general,
+        historyLimit: Int = ClipboardHistoryPolicy.defaultLimit
+    ) {
+        let writer = ClipboardHistoryWriter(
+            modelContainer: modelContainer,
+            historyLimit: historyLimit
+        )
+        self.init(
+            pasteboard: pasteboard,
+            persistSnapshot: { snapshot in await writer.persist(snapshot) }
+        )
     }
 
     func start() {
@@ -204,28 +205,4 @@ final class ClipboardMonitor {
         pollClipboard()
     }
 
-    nonisolated static func deriveTitle(
-        stringValue: String?,
-        availableTypes: [String],
-        fileURLs: [String]?
-    ) -> String {
-        if let text = stringValue, !text.isEmpty {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                return String(trimmed.prefix(50))
-            }
-        }
-        if let urls = fileURLs, let first = urls.first {
-            return "[File: \(URL(string: first)?.lastPathComponent ?? first)]"
-        }
-        // Scan all available types, not just the first one. The leading type can
-        // be an Apple-internal identifier that UTType does not resolve.
-        let uttypes = availableTypes.compactMap { UTType($0) }
-        if uttypes.contains(where: { $0.conforms(to: .image) }) { return "[Image]" }
-        if uttypes.contains(where: { $0.conforms(to: .pdf) }) { return "[PDF]" }
-        if uttypes.contains(where: { $0.conforms(to: .rtfd) }) { return "[RTFD]" }
-        if uttypes.contains(where: { $0.conforms(to: .rtf) }) { return "[RTF]" }
-        if uttypes.contains(where: { $0.conforms(to: .html) }) { return "[HTML]" }
-        return "[Clipboard Data]"
-    }
 }
