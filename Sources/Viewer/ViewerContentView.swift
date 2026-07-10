@@ -14,7 +14,7 @@ struct ViewerContentView: View {
     @Query(sort: \ClipItem.createdAt, order: .reverse)
     private var clipItems: [ClipItem]
 
-    @Bindable var viewerState: ViewerState
+    let viewerState: ViewerState
 
     let onPaste: (ClipItem, PasteFormat) -> Void
     let onClose: () -> Void
@@ -30,14 +30,17 @@ struct ViewerContentView: View {
             } else {
                 HistoryListView(
                     items: clipItems,
-                    selectedID: $viewerState.selectedID,
+                    viewerState: viewerState,
                     onItemTap: { item in
                         onPaste(item, .original)
                     }
                 )
             }
             Divider()
-            historyControls
+            HistoryControls(
+                viewerState: viewerState,
+                hasItems: !clipItems.isEmpty
+            )
         }
         .frame(minWidth: 350, idealWidth: 400, minHeight: 300, idealHeight: 500)
         .onChange(of: viewerState.pendingAction) { _, action in
@@ -53,22 +56,27 @@ struct ViewerContentView: View {
         }
     }
 
-    private var historyControls: some View {
-        HStack {
-            Button("Delete Selected") {
-                viewerState.perform(.deleteSelected)
-            }
-            .disabled(viewerState.selectedID == nil)
+    private struct HistoryControls: View {
+        @Bindable var viewerState: ViewerState
+        let hasItems: Bool
 
-            Spacer()
+        var body: some View {
+            HStack {
+                Button("Delete Selected") {
+                    viewerState.perform(.deleteSelected)
+                }
+                .disabled(viewerState.selectedID == nil)
 
-            Button("Clear All", role: .destructive) {
-                viewerState.perform(.clearHistory)
+                Spacer()
+
+                Button("Clear All", role: .destructive) {
+                    viewerState.perform(.clearHistory)
+                }
+                .disabled(!hasItems)
             }
-            .disabled(clipItems.isEmpty)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
     }
 
     private func handleViewAction(_ action: ViewerAction) {

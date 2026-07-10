@@ -20,6 +20,20 @@ enum ViewerAction: Equatable {
     case close
 }
 
+enum ViewerActionDispatchPolicy {
+    static let maximumMoveRepeatAge: TimeInterval = 0.1
+
+    static func shouldDispatch(
+        action: ViewerAction,
+        isRepeat: Bool,
+        eventTimestamp: TimeInterval,
+        currentTimestamp: TimeInterval
+    ) -> Bool {
+        guard isRepeat, case .move = action else { return true }
+        return currentTimestamp - eventTimestamp <= maximumMoveRepeatAge
+    }
+}
+
 @Observable
 @MainActor
 final class ViewerState {

@@ -31,9 +31,7 @@ final class ViewerPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    // Intercept key events at the window level (before the responder
-    // chain), so they are handled even when an internal NSTableView
-    // inside the SwiftUI List holds first-responder status.
+    // Intercept key events at the window level before the responder chain.
     override func sendEvent(_ event: NSEvent) {
         if event.type == .flagsChanged {
             trackedModifiers = event.modifierFlags
@@ -43,6 +41,12 @@ final class ViewerPanel: NSPanel {
            let action = EmacsKeyHandler.handle(
                event: event, trackedModifiers: trackedModifiers
            ) {
+            guard ViewerActionDispatchPolicy.shouldDispatch(
+                action: action,
+                isRepeat: event.isARepeat,
+                eventTimestamp: event.timestamp,
+                currentTimestamp: ProcessInfo.processInfo.systemUptime
+            ) else { return }
             viewerState.perform(action)
             return
         }
@@ -89,24 +93,13 @@ final class ViewerPanelController {
             )
             panel = ViewerPanel(viewerState: viewerState, contentView: hostingView)
         }
-        // Sync itemIDs before setting selection so that the first show()
-        // (before SwiftUI's onAppear has fired) already has valid data.
-        syncItemIDs()
+        // Query updates own item synchronization. Reopening starts at the top.
         viewerState.selectedID = viewerState.itemIDs.first
         // Clear stale modifier state from the Cmd+Shift+V hotkey
         panel?.resetTrackedModifiers()
         panel?.center()
         panel?.makeKeyAndOrderFront(nil)
         NSApp.activate()
-    }
-
-    private func syncItemIDs() {
-        let context = ModelContext(modelContainer)
-        let descriptor = FetchDescriptor<ClipItem>(
-            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
-        )
-        guard let items = try? context.fetch(descriptor) else { return }
-        viewerState.itemIDs = items.map(\.persistentModelID)
     }
 
     func close() {

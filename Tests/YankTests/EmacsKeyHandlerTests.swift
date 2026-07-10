@@ -14,6 +14,14 @@ final class EmacsKeyHandlerTests: XCTestCase {
         )
     }
 
+    func testRepeatedControlN_movesDown() {
+        let event = makeControlKeyEvent(character: "n", isARepeat: true)
+        XCTAssertEqual(
+            EmacsKeyHandler.handle(event: event, trackedModifiers: .control),
+            .move(.down)
+        )
+    }
+
     func testControlP_movesUp() {
         let event = makeControlKeyEvent(character: "p")
         XCTAssertEqual(
@@ -130,6 +138,63 @@ final class EmacsKeyHandlerTests: XCTestCase {
         XCTAssertEqual(EmacsKeyHandler.handle(event: event), .move(.up))
     }
 
+    // MARK: - Key repeat dispatch policy
+
+    func testMove_nonRepeatDispatchesRegardlessOfAge() {
+        XCTAssertTrue(
+            ViewerActionDispatchPolicy.shouldDispatch(
+                action: .move(.down),
+                isRepeat: false,
+                eventTimestamp: 1,
+                currentTimestamp: 10
+            )
+        )
+    }
+
+    func testMove_freshRepeatDispatches() {
+        XCTAssertTrue(
+            ViewerActionDispatchPolicy.shouldDispatch(
+                action: .move(.down),
+                isRepeat: true,
+                eventTimestamp: 10,
+                currentTimestamp: 10.099
+            )
+        )
+    }
+
+    func testMove_repeatAtAgeLimitDispatches() {
+        XCTAssertTrue(
+            ViewerActionDispatchPolicy.shouldDispatch(
+                action: .move(.down),
+                isRepeat: true,
+                eventTimestamp: 0,
+                currentTimestamp: ViewerActionDispatchPolicy.maximumMoveRepeatAge
+            )
+        )
+    }
+
+    func testMove_staleRepeatDoesNotDispatch() {
+        XCTAssertFalse(
+            ViewerActionDispatchPolicy.shouldDispatch(
+                action: .move(.down),
+                isRepeat: true,
+                eventTimestamp: 10,
+                currentTimestamp: 10.101
+            )
+        )
+    }
+
+    func testNonMovementAction_staleRepeatDispatches() {
+        XCTAssertTrue(
+            ViewerActionDispatchPolicy.shouldDispatch(
+                action: .close,
+                isRepeat: true,
+                eventTimestamp: 1,
+                currentTimestamp: 10
+            )
+        )
+    }
+
     // MARK: - Unhandled keys
 
     func testUnhandledKey_returnsNil() {
@@ -144,7 +209,10 @@ final class EmacsKeyHandlerTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeControlKeyEvent(character: String) -> NSEvent {
+    private func makeControlKeyEvent(
+        character: String,
+        isARepeat: Bool = false
+    ) -> NSEvent {
         NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -154,7 +222,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
             context: nil,
             characters: character,
             charactersIgnoringModifiers: character,
-            isARepeat: false,
+            isARepeat: isARepeat,
             keyCode: 0
         )!
     }
