@@ -16,6 +16,7 @@ private enum PasteboardSkipReason {
 @MainActor
 final class ClipboardMonitor {
     typealias PersistSnapshot = @Sendable (PasteboardSnapshot) async -> ClipboardPersistenceResult
+    typealias ClearHistory = @Sendable () async throws -> Void
 
     // Exposed (internal) so tests can assert the injected default is `.general`.
     let pasteboard: NSPasteboard
@@ -26,6 +27,9 @@ final class ClipboardMonitor {
 
     private var isCaptureInFlight = false
     private var isMonitoring = false
+    private var isShuttingDown = false
+    private var persistenceTask: Task<Void, Never>?
+    private var clearHistoryTask: Task<Void, Error>?
 
     /// - Parameter historyLimit: Applies only to the default persistence path.
     ///   When `persistSnapshot` is injected (tests), the built-in
@@ -53,6 +57,7 @@ final class ClipboardMonitor {
     }
 
     func start() {
+        guard !isShuttingDown else { return }
         timer?.invalidate()
         isMonitoring = true
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
@@ -69,6 +74,57 @@ final class ClipboardMonitor {
         timer?.invalidate()
         timer = nil
         logger.info("Stopped clipboard monitoring")
+    }
+
+    func stopAndDrain() async {
+        beginShutdown()
+        await finishShutdown()
+    }
+
+    func beginShutdown() {
+        isShuttingDown = true
+        stop()
+    }
+
+    func finishShutdown() async {
+        let pendingPersistence = persistenceTask
+        let pendingClear = clearHistoryTask
+        await pendingPersistence?.value
+        try? await pendingClear?.value
+    }
+
+    func clearHistory(using clearHistory: @escaping ClearHistory) async throws {
+        guard !isShuttingDown else { return }
+        if let clearHistoryTask {
+            try await clearHistoryTask.value
+            return
+        }
+
+        let shouldResumeMonitoring = isMonitoring
+        stop()
+        // Clear All is also a capture barrier. Discard pasteboard changes that
+        // happened before confirmation so the current value is not reinserted.
+        let captureBarrier = pasteboard.changeCount
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.persistenceTask?.value
+            do {
+                try await clearHistory()
+                self.lastChangeCount = captureBarrier
+                if shouldResumeMonitoring && !self.isShuttingDown {
+                    self.start()
+                }
+            } catch {
+                if shouldResumeMonitoring && !self.isShuttingDown {
+                    self.start()
+                }
+                throw error
+            }
+        }
+        clearHistoryTask = task
+        defer { clearHistoryTask = nil }
+        try await task.value
     }
 
     // Internal to support deterministic one-in-flight tests without waiting for
@@ -129,7 +185,7 @@ final class ClipboardMonitor {
 
         isCaptureInFlight = true
         let persistSnapshot = persistSnapshot
-        Task { [weak self] in
+        persistenceTask = Task { [weak self] in
             let result = await persistSnapshot(snapshot)
             self?.persistenceDidFinish(result)
         }
@@ -137,6 +193,7 @@ final class ClipboardMonitor {
 
     private func persistenceDidFinish(_ result: ClipboardPersistenceResult) {
         isCaptureInFlight = false
+        persistenceTask = nil
         if result == .noRestorablePayload {
             logger.debug("Skipping clip with no restorable payload")
         }

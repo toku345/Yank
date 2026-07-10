@@ -7,6 +7,7 @@ final class AppCoordinator {
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "AppCoordinator")
 
     private(set) var modelContainer: ModelContainer?
+    private(set) var clipboardHistoryWriter: ClipboardHistoryWriter?
     private(set) var clipboardMonitor: ClipboardMonitor?
     private(set) var hotKeyManager: HotKeyManager?
     private(set) var panelController: ViewerPanelController?
@@ -27,14 +28,24 @@ final class AppCoordinator {
         modelContainer = container
         hardenStoreFamily()
 
-        let monitor = ClipboardMonitor(modelContainer: container)
+        let writer = ClipboardHistoryWriter(modelContainer: container)
+        clipboardHistoryWriter = writer
+
+        let monitor = ClipboardMonitor(
+            modelContainer: container,
+            persistSnapshot: { snapshot in await writer.persist(snapshot) }
+        )
         monitor.start()
         clipboardMonitor = monitor
 
         let viewerState = ViewerState()
         let controller = ViewerPanelController(
             modelContainer: container,
-            viewerState: viewerState
+            viewerState: viewerState,
+            onClearHistory: { [weak self] in
+                guard let self else { return }
+                try await self.clearHistory()
+            }
         )
         controller.onPaste = { [weak self] item, format in self?.handlePaste(item, format: format) }
         controller.onClose = { [weak self] in self?.panelController?.close() }
@@ -55,9 +66,20 @@ final class AppCoordinator {
         logger.info("Yank initialized successfully")
     }
 
-    func shutdown() {
-        clipboardMonitor?.stop()
+    func beginShutdown() {
+        clipboardMonitor?.beginShutdown()
         hotKeyManager?.unregister()
+    }
+
+    func finishShutdown() async {
+        await clipboardMonitor?.finishShutdown()
+    }
+
+    private func clearHistory() async throws {
+        guard let clipboardMonitor, let clipboardHistoryWriter else { return }
+        try await clipboardMonitor.clearHistory {
+            try await clipboardHistoryWriter.clearAll()
+        }
     }
 
     // ADR 0003 Stage 1: write → close → simulate (no delay)

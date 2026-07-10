@@ -1,21 +1,38 @@
+// swiftlint:disable file_length
 import XCTest
 import AppKit
 import SwiftData
 @testable import Yank
 
+private enum ClearHistoryTestError: Error {
+    case failed
+}
+
 private actor PersistenceGate {
+    typealias DidRecord = @Sendable (Int) -> Void
+
     private var snapshots: [PasteboardSnapshot] = []
     private var firstContinuation: CheckedContinuation<Void, Never>?
     private var firstReleased = false
+    private let didRecord: DidRecord
+
+    init(didRecord: @escaping DidRecord = { _ in }) {
+        self.didRecord = didRecord
+    }
 
     func persist(_ snapshot: PasteboardSnapshot) async -> ClipboardPersistenceResult {
+        await waitBeforePersisting(snapshot)
+        return .saved(prunedCount: 0)
+    }
+
+    func waitBeforePersisting(_ snapshot: PasteboardSnapshot) async {
         snapshots.append(snapshot)
+        didRecord(snapshots.count)
         if snapshots.count == 1 && !firstReleased {
             await withCheckedContinuation { continuation in
                 firstContinuation = continuation
             }
         }
-        return .saved(prunedCount: 0)
     }
 
     func releaseFirst() {
@@ -29,7 +46,43 @@ private actor PersistenceGate {
     }
 }
 
+private actor AsyncGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+
+    func wait() async {
+        guard !released else { return }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private final class EventRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [String] = []
+
+    func append(_ event: String) {
+        lock.lock()
+        events.append(event)
+        lock.unlock()
+    }
+
+    var values: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return events
+    }
+}
+
 @MainActor
+// swiftlint:disable:next type_body_length
 final class ClipboardMonitorTests: XCTestCase {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -47,14 +100,6 @@ final class ClipboardMonitorTests: XCTestCase {
             expectation.fulfill()
         }
         wait(for: [expectation], timeout: 1.0)
-    }
-
-    private func waitForPersistenceCount(_ expectedCount: Int, gate: PersistenceGate) async {
-        for _ in 0..<100 {
-            if await gate.values().count >= expectedCount { return }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-        }
-        XCTFail("Timed out waiting for \(expectedCount) persistence calls")
     }
 
     // Guards the production default: AppCoordinator constructs ClipboardMonitor
@@ -224,7 +269,12 @@ final class ClipboardMonitorTests: XCTestCase {
     func testBusyPollLeavesChangePendingAndRepollsAfterPersistence() async throws {
         let container = try makeContainer()
         let pasteboard = makeTestPasteboard()
-        let gate = PersistenceGate()
+        let firstStarted = expectation(description: "first persistence started")
+        let secondStarted = expectation(description: "second persistence started")
+        let gate = PersistenceGate { count in
+            if count == 1 { firstStarted.fulfill() }
+            if count == 2 { secondStarted.fulfill() }
+        }
         let monitor = ClipboardMonitor(
             modelContainer: container,
             pasteboard: pasteboard,
@@ -235,7 +285,7 @@ final class ClipboardMonitorTests: XCTestCase {
 
         writeString("first", to: pasteboard)
         monitor.pollClipboard()
-        await waitForPersistenceCount(1, gate: gate)
+        await fulfillment(of: [firstStarted], timeout: 1.0)
 
         pasteboard.clearContents()
         writeString("second", to: pasteboard)
@@ -244,8 +294,169 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertEqual(values, ["first"])
 
         await gate.releaseFirst()
-        await waitForPersistenceCount(2, gate: gate)
+        await fulfillment(of: [secondStarted], timeout: 1.0)
         values = await gate.values()
         XCTAssertEqual(values, ["first", "second"])
+    }
+
+    func testClearHistoryWaitsForInFlightCaptureAndDiscardsPendingChange() async throws {
+        let container = try makeContainer()
+        let seedContext = ModelContext(container)
+        seedContext.insert(ClipItem(
+            title: "existing",
+            primaryType: NSPasteboard.PasteboardType.string.rawValue,
+            availableTypes: [NSPasteboard.PasteboardType.string.rawValue],
+            stringValue: "existing"
+        ))
+        try seedContext.save()
+
+        let pasteboard = makeTestPasteboard()
+        let firstStarted = expectation(description: "in-flight persistence started")
+        let gate = PersistenceGate { count in
+            if count == 1 { firstStarted.fulfill() }
+        }
+        let writer = ClipboardHistoryWriter(modelContainer: container)
+        let monitor = ClipboardMonitor(
+            modelContainer: container,
+            pasteboard: pasteboard,
+            persistSnapshot: { snapshot in
+                await gate.waitBeforePersisting(snapshot)
+                return await writer.persist(snapshot)
+            }
+        )
+        monitor.start()
+        defer { monitor.stop() }
+
+        writeString("first", to: pasteboard)
+        monitor.pollClipboard()
+        await fulfillment(of: [firstStarted], timeout: 1.0)
+        pasteboard.clearContents()
+        writeString("second", to: pasteboard)
+        monitor.pollClipboard()
+
+        let clearStarted = expectation(description: "clear history requested")
+        let clearTask = Task {
+            clearStarted.fulfill()
+            try await monitor.clearHistory { try await writer.clearAll() }
+        }
+        await fulfillment(of: [clearStarted], timeout: 1.0)
+        await gate.releaseFirst()
+        try await clearTask.value
+
+        monitor.pollClipboard()
+        await monitor.stopAndDrain()
+
+        let persistedValues = await gate.values()
+        XCTAssertEqual(persistedValues, ["first"])
+        XCTAssertTrue(try ModelContext(container).fetch(FetchDescriptor<ClipItem>()).isEmpty)
+    }
+
+    func testClearHistoryFailureResumesAndCapturesPendingChange() async throws {
+        let container = try makeContainer()
+        let pasteboard = makeTestPasteboard()
+        let persistenceStarted = expectation(description: "pending change captured after clear failure")
+        let gate = PersistenceGate { count in
+            if count == 1 { persistenceStarted.fulfill() }
+        }
+        await gate.releaseFirst()
+        let monitor = ClipboardMonitor(
+            modelContainer: container,
+            pasteboard: pasteboard,
+            persistSnapshot: { snapshot in await gate.persist(snapshot) }
+        )
+        monitor.start()
+
+        writeString("pending after failed clear", to: pasteboard)
+        do {
+            try await monitor.clearHistory { throw ClearHistoryTestError.failed }
+            XCTFail("Expected clearHistory to throw")
+        } catch ClearHistoryTestError.failed {
+            // Expected.
+        }
+
+        monitor.pollClipboard()
+        await fulfillment(of: [persistenceStarted], timeout: 1.0)
+        await monitor.stopAndDrain()
+
+        let values = await gate.values()
+        XCTAssertEqual(values, ["pending after failed clear"])
+    }
+
+    func testStopAndDrainWaitsForInFlightPersistence() async throws {
+        let container = try makeContainer()
+        let pasteboard = makeTestPasteboard()
+        let persistenceStarted = expectation(description: "persistence started")
+        let gate = PersistenceGate { count in
+            if count == 1 { persistenceStarted.fulfill() }
+        }
+        let events = EventRecorder()
+        let writer = ClipboardHistoryWriter(modelContainer: container)
+        let monitor = ClipboardMonitor(
+            modelContainer: container,
+            pasteboard: pasteboard,
+            persistSnapshot: { snapshot in
+                events.append("persist-start")
+                await gate.waitBeforePersisting(snapshot)
+                let result = await writer.persist(snapshot)
+                events.append("persist-finish")
+                return result
+            }
+        )
+        monitor.start()
+
+        writeString("shutdown capture", to: pasteboard)
+        monitor.pollClipboard()
+        await fulfillment(of: [persistenceStarted], timeout: 1.0)
+
+        let drainStarted = expectation(description: "drain requested")
+        let drainTask = Task {
+            drainStarted.fulfill()
+            await monitor.stopAndDrain()
+            events.append("drain-finish")
+        }
+        await fulfillment(of: [drainStarted], timeout: 1.0)
+        await gate.releaseFirst()
+        await drainTask.value
+
+        XCTAssertEqual(events.values, ["persist-start", "persist-finish", "drain-finish"])
+        let items = try ModelContext(container).fetch(FetchDescriptor<ClipItem>())
+        XCTAssertEqual(items.compactMap(\.stringValue), ["shutdown capture"])
+    }
+
+    func testApplicationShouldTerminateRepliesOnceAfterDrain() async {
+        let events = EventRecorder()
+        let finishGate = AsyncGate()
+        let finishStarted = expectation(description: "finish shutdown started")
+        let replied = expectation(description: "termination reply sent")
+        let application = NSApplication.shared
+        let delegate = AppDelegate(
+            coordinator: AppCoordinator(),
+            beginShutdown: { events.append("begin") },
+            finishShutdown: {
+                events.append("finish-start")
+                finishStarted.fulfill()
+                await finishGate.wait()
+                events.append("finish-end")
+            },
+            replyToTermination: { replyingApplication, shouldTerminate in
+                XCTAssertTrue(replyingApplication === application)
+                XCTAssertTrue(shouldTerminate)
+                events.append("reply")
+                replied.fulfill()
+            }
+        )
+
+        XCTAssertEqual(delegate.applicationShouldTerminate(application), .terminateLater)
+        XCTAssertEqual(delegate.applicationShouldTerminate(application), .terminateLater)
+        await fulfillment(of: [finishStarted], timeout: 1.0)
+        XCTAssertEqual(events.values, ["begin", "finish-start"])
+
+        await finishGate.release()
+        await fulfillment(of: [replied], timeout: 1.0)
+        await Task.yield()
+
+        XCTAssertEqual(events.values, ["begin", "finish-start", "finish-end", "reply"])
+        XCTAssertEqual(delegate.applicationShouldTerminate(application), .terminateNow)
+        XCTAssertEqual(events.values.filter { $0 == "reply" }.count, 1)
     }
 }

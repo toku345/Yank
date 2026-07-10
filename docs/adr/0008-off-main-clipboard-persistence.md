@@ -43,6 +43,11 @@ monitor polls again so a change that arrived while the writer was busy is
 captured. Intermediate changes may still collapse to the latest pasteboard
 state, matching the existing 250 ms polling behavior.
 
+Clear All pauses polling, advances the capture barrier to the confirmed
+pasteboard state, drains any in-flight capture, and then asks the same writer
+actor to refetch and delete every stored item. Normal app termination uses
+AppKit's deferred-termination reply to drain active persistence before exit.
+
 The capture timestamp is recorded on `MainActor` and carried in the snapshot.
 It is not generated later by the writer because actor scheduling delay must not
 change history ordering.
@@ -69,6 +74,8 @@ Negative:
   collapse to the newest pasteboard state.
 - A permanently failing prune can temporarily leave more than the configured
   history limit until a later capture retries pruning.
+- Clear All and normal termination can wait for a large synchronous store
+  operation already running on the writer actor.
 
 Risks:
 
@@ -77,8 +84,8 @@ Risks:
   verification. If it does not hold on the deployment target, the change must
   stop for a data-layer redesign rather than add an implicit merge protocol.
 - Cancellation cannot interrupt a synchronous SwiftData save already in
-  progress. Stopping the monitor suppresses completion-time polling but allows
-  the active store operation to finish.
+  progress. Stopping the monitor suppresses completion-time polling, and normal
+  termination is deferred until the active store operation finishes.
 
 ## Validation
 
@@ -90,5 +97,6 @@ save, fingerprint, and prune work ran on the writer actor rather than the main
 thread.
 
 The test suite also mounts an `@Query` against an in-memory container and
-verifies that a writer-context save changes the observed count from zero to one
-without a manual merge channel.
+verifies that writer-context insert and prune saves update the observed values
+without a manual merge channel. Deterministic gates cover Clear All and
+termination while a capture is in flight.

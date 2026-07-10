@@ -109,6 +109,24 @@ actor ClipboardHistoryWriter {
         return .saved(prunedCount: prunedCount)
     }
 
+    func clearAll() throws {
+        let context = persistenceContext()
+        do {
+            let items = try context.fetch(FetchDescriptor<ClipItem>())
+            for item in items {
+                context.delete(item)
+            }
+            try saveContext(context)
+            lastPersistedFingerprint = nil
+        } catch {
+            context.rollback()
+            logger.error(
+                "Failed to clear clipboard history: \(error.localizedDescription, privacy: .public)"
+            )
+            throw error
+        }
+    }
+
     private func persistenceContext() -> ModelContext {
         if let modelContext { return modelContext }
 
