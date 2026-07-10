@@ -27,6 +27,10 @@ final class ClipboardMonitor {
     private var isCaptureInFlight = false
     private var isMonitoring = false
 
+    /// - Parameter historyLimit: Applies only to the default persistence path.
+    ///   When `persistSnapshot` is injected (tests), the built-in
+    ///   `ClipboardHistoryWriter` is not constructed and `historyLimit` is ignored;
+    ///   the injected closure owns any pruning behavior.
     init(
         modelContainer: ModelContainer,
         pasteboard: NSPasteboard = .general,
