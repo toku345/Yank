@@ -11,7 +11,6 @@ struct YankApp: App {
             }
             Divider()
             Button("Quit") {
-                appDelegate.coordinator.shutdown()
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
