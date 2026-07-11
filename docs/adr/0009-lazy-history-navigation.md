@@ -88,19 +88,31 @@ A Time Profiler run mounted 1,000 synthetic rows and delivered 100 fresh `C-n`
 events through `ViewerPanel.sendEvent`. Selection advanced from index zero to
 index 100 in 175.61 ms, compared with the 943 ms baseline, an 81 percent
 reduction. The trace contained no `NSTableView` samples and no potential hang.
-Separate tests cover non-repeat input, the exact 100 ms boundary, stale repeats,
-and a 1,000-row navigation state.
+Tests cover non-repeat input, the exact 100 ms boundary, stale repeats, and a
+1,000-row navigation state. `ViewerPanelTests` also injects a deterministic
+uptime provider and sends key events through `ViewerPanel.sendEvent`, proving
+that a fresh repeat is dispatched, a stale repeat is discarded, and a stale
+non-repeat is still dispatched. This covers the timestamp subtraction and
+`event.isARepeat` wiring rather than only the pure policy.
 
-Coverage boundary. Automated tests exercise the pure `ViewerActionDispatchPolicy`
-decision only. Two pieces are verified manually rather than by unit tests, since
-neither is practical to drive without a live SwiftUI/AppKit host:
+`HistoryListAccessibilityTests` mounts synthetic rows in an ordered AppKit test
+window and traverses the accessibility elements emitted by SwiftUI. It verifies
+that a row exposes the `AXButton` role and clip title label, reflects
+`ViewerState.selectedID` through its selected state, and routes an accessibility
+press to the expected item activation callback. The same contract was rechecked
+on 2026-07-11 in a normal signed Debug fixture on macOS 26.5.1 with Xcode 26.4;
+pressing the initially unselected row updated both its AX selected state and the
+activation target.
 
-- the `ViewerPanel.sendEvent` wiring that derives `age` from
-  `ProcessInfo.processInfo.systemUptime - event.timestamp` and passes
-  `event.isARepeat` — confirmed via the Time Profiler run above;
+Coverage boundaries remain:
+
 - the 16 ms cancellable `SelectionScroller` `.task(id:)` that coalesces rapid
-  movement into a single scroll to the latest selection — confirmed by observing
-  a single terminal scroll during rapid navigation in the same run.
+  movement into a single scroll to the latest selection is confirmed by
+  observing a single terminal scroll during the profiling run;
+- automated AX checks do not verify VoiceOver speech, focus traversal, or the
+  interaction inside the real nonactivating `ViewerPanel`.
 
-A regression in either would pass the policy unit tests, so changes there require
-re-running the manual navigation/profiling check.
+Before release, and whenever row accessibility semantics change, manually verify
+with VoiceOver that the clip title and button role are announced, `C-n` / `C-p`
+updates the announced selected row, and activating another row pastes the
+expected original-format item.
