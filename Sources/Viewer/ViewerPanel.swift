@@ -44,8 +44,7 @@ final class ViewerPanel: NSPanel {
             guard ViewerActionDispatchPolicy.shouldDispatch(
                 action: action,
                 isRepeat: event.isARepeat,
-                eventTimestamp: event.timestamp,
-                currentTimestamp: ProcessInfo.processInfo.systemUptime
+                age: ProcessInfo.processInfo.systemUptime - event.timestamp
             ) else { return }
             viewerState.perform(action)
             return

@@ -49,9 +49,12 @@ Amend ADR 0004's event contract as follows:
 - an auto-repeat movement event older than 100 ms is stale and may be discarded;
 - paste, delete, close, and jump actions are never discarded by this policy.
 
-Event age is calculated from `NSEvent.timestamp` and system uptime. The policy
-is a safety net for already-delayed input, not a substitute for reducing view
-update cost.
+Event age is calculated from `NSEvent.timestamp` and system uptime. The caller
+computes this as a single `age` value from one monotonic clock and passes it to
+`ViewerActionDispatchPolicy.shouldDispatch(action:isRepeat:age:)`; the policy
+never receives two raw timestamps, so it cannot mix incompatible time bases. The
+policy is a safety net for already-delayed input, not a substitute for reducing
+view update cost.
 
 ## Consequences
 

@@ -145,8 +145,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
             ViewerActionDispatchPolicy.shouldDispatch(
                 action: .move(.down),
                 isRepeat: false,
-                eventTimestamp: 1,
-                currentTimestamp: 10
+                age: 9
             )
         )
     }
@@ -156,8 +155,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
             ViewerActionDispatchPolicy.shouldDispatch(
                 action: .move(.down),
                 isRepeat: true,
-                eventTimestamp: 10,
-                currentTimestamp: 10.099
+                age: 0.099
             )
         )
     }
@@ -167,8 +165,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
             ViewerActionDispatchPolicy.shouldDispatch(
                 action: .move(.down),
                 isRepeat: true,
-                eventTimestamp: 0,
-                currentTimestamp: ViewerActionDispatchPolicy.maximumMoveRepeatAge
+                age: ViewerActionDispatchPolicy.maximumMoveRepeatAge
             )
         )
     }
@@ -178,8 +175,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
             ViewerActionDispatchPolicy.shouldDispatch(
                 action: .move(.down),
                 isRepeat: true,
-                eventTimestamp: 10,
-                currentTimestamp: 10.101
+                age: 0.101
             )
         )
     }
@@ -189,8 +185,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
             ViewerActionDispatchPolicy.shouldDispatch(
                 action: .close,
                 isRepeat: true,
-                eventTimestamp: 1,
-                currentTimestamp: 10
+                age: 9
             )
         )
     }
