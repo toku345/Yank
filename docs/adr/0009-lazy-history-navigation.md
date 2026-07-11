@@ -90,3 +90,17 @@ index 100 in 175.61 ms, compared with the 943 ms baseline, an 81 percent
 reduction. The trace contained no `NSTableView` samples and no potential hang.
 Separate tests cover non-repeat input, the exact 100 ms boundary, stale repeats,
 and a 1,000-row navigation state.
+
+Coverage boundary. Automated tests exercise the pure `ViewerActionDispatchPolicy`
+decision only. Two pieces are verified manually rather than by unit tests, since
+neither is practical to drive without a live SwiftUI/AppKit host:
+
+- the `ViewerPanel.sendEvent` wiring that derives `age` from
+  `ProcessInfo.processInfo.systemUptime - event.timestamp` and passes
+  `event.isARepeat` — confirmed via the Time Profiler run above;
+- the 16 ms cancellable `SelectionScroller` `.task(id:)` that coalesces rapid
+  movement into a single scroll to the latest selection — confirmed by observing
+  a single terminal scroll during rapid navigation in the same run.
+
+A regression in either would pass the policy unit tests, so changes there require
+re-running the manual navigation/profiling check.
