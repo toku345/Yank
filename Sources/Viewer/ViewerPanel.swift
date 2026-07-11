@@ -5,13 +5,21 @@ import os.log
 
 final class ViewerPanel: NSPanel {
     let viewerState: ViewerState
+    private let currentUptime: () -> TimeInterval
     /// Tracks modifier keys via flagsChanged events for reliable detection.
     /// NSEvent.modifierFlags on keyDown carries stale state from prior
     /// key combos (Cmd+Shift+V hotkey, Ctrl+N/P navigation).
     private var trackedModifiers: NSEvent.ModifierFlags = []
 
-    init(viewerState: ViewerState, contentView: NSView) {
+    init(
+        viewerState: ViewerState,
+        contentView: NSView,
+        currentUptime: @escaping () -> TimeInterval = {
+            ProcessInfo.processInfo.systemUptime
+        }
+    ) {
         self.viewerState = viewerState
+        self.currentUptime = currentUptime
 
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
@@ -47,7 +55,7 @@ final class ViewerPanel: NSPanel {
             guard ViewerActionDispatchPolicy.shouldDispatch(
                 action: action,
                 isRepeat: event.isARepeat,
-                age: ProcessInfo.processInfo.systemUptime - event.timestamp
+                age: currentUptime() - event.timestamp
             ) else { return }
             viewerState.perform(action)
             return
