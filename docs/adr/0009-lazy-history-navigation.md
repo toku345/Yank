@@ -23,6 +23,14 @@ fixed event loss caused by using observable state as an event channel, but it
 did not distinguish current input from auto-repeat events delayed by a main
 thread stall.
 
+A follow-up unit test hosted synthetic history rows in an ordered `NSWindow`
+and traversed the SwiftUI accessibility hierarchy. It passed in signed local
+GUI test hosts with Xcode 16.4 and 26.4, but two runs on GitHub's `macos-15`
+runner with Xcode 16.4 did not expose the expected row button within two
+seconds. Treating a missing row as a reason to skip would also hide a real
+accessibility regression, so runtime hierarchy traversal is not a reliable
+default CI test for this view.
+
 ## Decision
 
 Replace `List(selection:)` with `ScrollViewReader`, `ScrollView`, and
@@ -40,6 +48,17 @@ Replace `List(selection:)` with `ScrollViewReader`, `ScrollView`, and
 - `ViewerPanelController` no longer performs a second full SwiftData fetch merely
   to seed navigation IDs. The mounted query owns synchronization with
   `ViewerState`.
+
+Centralize each row's label, selected state, and activation in an internal
+`HistoryRowContract` used directly by `HistoryRowButton`. The contract:
+
+- derives the accessibility label from `ClipItem.title`;
+- compares the row identifier with `ViewerState.selectedID`;
+- updates the selection before invoking the item callback.
+
+Automated tests will exercise this same contract without traversing the runtime
+accessibility hierarchy. The SwiftUI-to-AppKit accessibility bridge and
+VoiceOver behavior remain manual validation boundaries.
 
 Amend ADR 0004's event contract as follows:
 
@@ -66,7 +85,7 @@ Positive:
   input.
 - Input queued during a long main-thread stall cannot replay all the way to the
   end of the list.
-- Mouse activation and accessibility remain explicit and testable.
+- Mouse activation and row semantics share one explicit, deterministic contract.
 
 Negative:
 
@@ -77,8 +96,9 @@ Negative:
 
 Risks:
 
-- Manual row semantics can regress VoiceOver operation. Verification must cover
-  labels, selected state, and activation in addition to visual behavior.
+- Removing or misattaching a SwiftUI accessibility modifier can pass the
+  contract tests. Release verification must therefore cover the emitted role,
+  label, selected state, focus traversal, and activation.
 - The 100 ms threshold is intentionally UX policy rather than a platform
   constant. Tests fix its boundary behavior so future changes are explicit.
 
@@ -95,24 +115,16 @@ that a fresh repeat is dispatched, a stale repeat is discarded, and a stale
 non-repeat is still dispatched. This covers the timestamp subtraction and
 `event.isARepeat` wiring rather than only the pure policy.
 
-`HistoryListAccessibilityTests` mounts synthetic rows in an ordered AppKit test
-window and traverses the accessibility elements emitted by SwiftUI. It verifies
-that a row exposes the `AXButton` role and clip title label, reflects
-`ViewerState.selectedID` through its selected state, and routes an accessibility
-press to the expected item activation callback. The same contract was rechecked
-on 2026-07-11 in a normal signed Debug fixture on macOS 26.5.1 with Xcode 26.4;
-pressing the initially unselected row updated both its AX selected state and the
-activation target.
+A signed local ordered-`NSWindow` fixture on macOS 26.5.1 verified the runtime
+bridge with Xcode 16.4 and 26.4: rows exposed the `AXButton` role and clip title,
+reflected selection, and routed accessibility activation to the item callback.
+This fixture did not exercise VoiceOver or the real nonactivating `ViewerPanel`.
 
-Coverage boundaries remain:
+The 16 ms cancellable `SelectionScroller` was also confirmed manually during
+the profiling run above to issue one terminal scroll during rapid navigation.
 
-- the 16 ms cancellable `SelectionScroller` `.task(id:)` that coalesces rapid
-  movement into a single scroll to the latest selection is confirmed by
-  observing a single terminal scroll during the profiling run;
-- automated AX checks do not verify VoiceOver speech, focus traversal, or the
-  interaction inside the real nonactivating `ViewerPanel`.
-
-Before release, and whenever row accessibility semantics change, manually verify
-with VoiceOver that the clip title and button role are announced, `C-n` / `C-p`
-updates the announced selected row, and activating another row pastes the
-expected original-format item.
+Before release, and whenever row accessibility semantics change, use VoiceOver
+to verify that focus traverses the rows; the clip title, button role, and
+selected state are announced; `C-n` / `C-p` updates the announced selection;
+and VO-Space activation on another row pastes the expected original-format
+item.
