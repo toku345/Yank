@@ -51,33 +51,52 @@ private struct SelectionScroller: View {
     }
 }
 
+@MainActor
+struct HistoryRowContract {
+    let item: ClipItem
+    let viewerState: ViewerState
+    let onActivate: ((ClipItem) -> Void)?
+
+    var accessibilityLabel: String {
+        item.title
+    }
+
+    var isSelected: Bool {
+        viewerState.selectedID == item.persistentModelID
+    }
+
+    func activate() {
+        viewerState.selectedID = item.persistentModelID
+        onActivate?(item)
+    }
+}
+
 private struct HistoryRowButton: View {
     let item: ClipItem
     @Bindable var viewerState: ViewerState
     var onItemTap: ((ClipItem) -> Void)?
 
-    private var isSelected: Bool {
-        viewerState.selectedID == item.persistentModelID
-    }
-
     var body: some View {
-        Button {
-            viewerState.selectedID = item.persistentModelID
-            onItemTap?(item)
-        } label: {
+        let contract = HistoryRowContract(
+            item: item,
+            viewerState: viewerState,
+            onActivate: onItemTap
+        )
+
+        Button(action: contract.activate) {
             HistoryRow(item: item)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(isSelected ? Color.accentColor.opacity(0.18) : .clear)
+                        .fill(contract.isSelected ? Color.accentColor.opacity(0.18) : .clear)
                 )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(item.title))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityLabel(Text(contract.accessibilityLabel))
+        .accessibilityAddTraits(contract.isSelected ? .isSelected : [])
     }
 }
 
