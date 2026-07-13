@@ -70,11 +70,22 @@ final class ViewerPanel: NSPanel {
 
 @MainActor
 final class ViewerPanelController {
+    typealias HistoryIDLoader = @MainActor () throws -> [PersistentIdentifier]
+    typealias LoadFailureReporter = @MainActor (Error) -> Void
+    typealias PanelPresenter = @MainActor (ViewerPanel) -> Void
+
+    private static let logger = Logger(
+        subsystem: "com.toku345.Yank",
+        category: "ViewerPanelController"
+    )
+
     private var panel: ViewerPanel?
     private let modelContainer: ModelContainer
     private let viewerState: ViewerState
     private let clearHistory: @MainActor () async throws -> Void
-    private let logger = Logger(subsystem: "com.toku345.Yank", category: "ViewerPanelController")
+    private let loadHistoryIDs: HistoryIDLoader
+    private let reportLoadFailure: LoadFailureReporter
+    private let presentPanel: PanelPresenter
 
     var onPaste: ((ClipItem, PasteFormat) -> Void)?
     var onClose: (() -> Void)?
@@ -82,11 +93,19 @@ final class ViewerPanelController {
     init(
         modelContainer: ModelContainer,
         viewerState: ViewerState,
-        onClearHistory: @escaping @MainActor () async throws -> Void
+        onClearHistory: @escaping @MainActor () async throws -> Void,
+        loadHistoryIDs: HistoryIDLoader? = nil,
+        reportLoadFailure: LoadFailureReporter? = nil,
+        presentPanel: PanelPresenter? = nil
     ) {
         self.modelContainer = modelContainer
         self.viewerState = viewerState
         self.clearHistory = onClearHistory
+        self.loadHistoryIDs = loadHistoryIDs ?? Self.makeHistoryIDLoader(
+            modelContainer: modelContainer
+        )
+        self.reportLoadFailure = reportLoadFailure ?? Self.reportHistoryLoadFailure
+        self.presentPanel = presentPanel ?? Self.presentPanel
     }
 
     func toggle() {
@@ -97,34 +116,97 @@ final class ViewerPanelController {
         }
     }
 
-    func show() {
-        if panel == nil {
-            let contentView = ViewerContentView(
-                viewerState: viewerState,
-                onPaste: { [weak self] item, format in self?.onPaste?(item, format) },
-                onClose: { [weak self] in self?.onClose?() },
-                onClearHistory: { [weak self] in
-                    guard let self else { return }
-                    try await self.clearHistory()
-                }
-            )
-            let hostingView = NSHostingView(
-                rootView: contentView.modelContainer(modelContainer)
-            )
-            panel = ViewerPanel(viewerState: viewerState, contentView: hostingView)
+    @discardableResult
+    func show() -> Bool {
+        let itemIDs: [PersistentIdentifier]
+        do {
+            itemIDs = try loadHistoryIDs()
+        } catch {
+            viewerState.clearItems()
+            reportLoadFailure(error)
+            return false
         }
-        // Query updates own item synchronization. Reopening starts at the top.
-        viewerState.selectedID = viewerState.itemIDs.first
-        // Clear stale modifier state from the Cmd+Shift+V hotkey
-        panel?.resetTrackedModifiers()
-        panel?.center()
-        panel?.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+
+        viewerState.replaceItems(with: itemIDs)
+        viewerState.selectedID = itemIDs.first
+        let panel = panelForPresentation()
+        panel.resetTrackedModifiers()
+        presentPanel(panel)
+        return true
     }
 
     func close() {
         panel?.orderOut(nil)
         NSApp.hide(nil)
-        logger.debug("Panel closed, app hidden")
+        Self.logger.debug("Panel closed, app hidden")
+    }
+
+    private func panelForPresentation() -> ViewerPanel {
+        if let panel {
+            return panel
+        }
+
+        let contentView = ViewerContentView(
+            viewerState: viewerState,
+            onPaste: { [weak self] item, format in self?.onPaste?(item, format) },
+            onClose: { [weak self] in self?.onClose?() },
+            onClearHistory: { [weak self] in
+                guard let self else { return }
+                try await self.clearHistory()
+            }
+        )
+        let hostingView = NSHostingView(
+            rootView: contentView.modelContainer(modelContainer)
+        )
+        let newPanel = ViewerPanel(
+            viewerState: viewerState,
+            contentView: hostingView
+        )
+        panel = newPanel
+        return newPanel
+    }
+
+    private static func makeHistoryIDLoader(
+        modelContainer: ModelContainer
+    ) -> HistoryIDLoader {
+        {
+            try loadSavedHistoryIDs(from: modelContainer)
+        }
+    }
+
+    static func loadSavedHistoryIDs(
+        from modelContainer: ModelContainer
+    ) throws -> [PersistentIdentifier] {
+        let context = ModelContext(modelContainer)
+        var descriptor = FetchDescriptor<ClipItem>(
+            sortBy: [SortDescriptor(\ClipItem.createdAt, order: .reverse)]
+        )
+        descriptor.includePendingChanges = false
+        return try context.fetchIdentifiers(descriptor)
+    }
+
+    private static func reportHistoryLoadFailure(_ error: Error) {
+        logger.error(
+            """
+            Failed to load clipboard history identifiers; \
+            errorType=\(String(reflecting: type(of: error)), privacy: .public); \
+            error=\(error.localizedDescription, privacy: .private)
+            """
+        )
+        let alert = NSAlert()
+        alert.messageText = "Could not open clipboard history"
+        alert.informativeText = """
+            Yank could not load saved clipboard history, so the viewer was not opened. \
+            Your saved history was not changed. \
+            \(error.localizedDescription)
+            """
+        alert.alertStyle = .warning
+        alert.runModal()
+    }
+
+    private static func presentPanel(_ panel: ViewerPanel) {
+        panel.center()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate()
     }
 }
