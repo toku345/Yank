@@ -95,6 +95,7 @@ private struct HistoryRowButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable(false)
         .accessibilityLabel(Text(contract.accessibilityLabel))
         .accessibilityAddTraits(contract.isSelected ? .isSelected : [])
     }
