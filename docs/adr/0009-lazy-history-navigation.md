@@ -31,6 +31,12 @@ seconds. Treating a missing row as a reason to skip would also hide a real
 accessibility regression, so runtime hierarchy traversal is not a reliable
 default CI test for this view.
 
+A later review found two remaining consistency gaps. `show()` could seed
+selection from `ViewerState.itemIDs` before the mounted query had synchronized,
+making an empty or stale selection interactive. A row button could also retain
+keyboard focus while `C-n`, `C-p`, or an arrow key moved the selected ID; bare
+Space would then activate the focused row instead of the selected row.
+
 ## Decision
 
 Replace `List(selection:)` with `ScrollViewReader`, `ScrollView`, and
@@ -45,9 +51,17 @@ Replace `List(selection:)` with `ScrollViewReader`, `ScrollView`, and
 - Query ownership, list rendering, and history controls are separate observation
   boundaries so a selection-only change does not rebuild the full query ID
   array.
-- `ViewerPanelController` no longer performs a second full SwiftData fetch merely
-  to seed navigation IDs. The mounted query owns synchronization with
-  `ViewerState`.
+- Immediately before presentation, `ViewerPanelController` loads an
+  identifier-only snapshot with the same newest-first sort as the mounted query.
+  It uses a fresh `ModelContext`, excludes pending changes, synchronizes
+  `ViewerState.itemIDs`, and selects the first ID before the panel is interactive.
+  The mounted query continues to own ongoing synchronization.
+- If the identifier snapshot fails, clear stale navigation state, report the
+  error, and do not present the panel.
+
+The identifier snapshot uses `fetchIdentifiers` so presentation does not
+materialize a second array of `ClipItem` objects. This was chosen over a
+query-readiness handshake, which would add presentation and input-gating state.
 
 Centralize each row's label, selected state, and activation in an internal
 `HistoryRowContract` used directly by `HistoryRowButton`. The contract:
@@ -55,6 +69,15 @@ Centralize each row's label, selected state, and activation in an internal
 - derives the accessibility label from `ClipItem.title`;
 - compares the row identifier with `ViewerState.selectedID`;
 - updates the selection before invoking the item callback.
+
+History row buttons do not participate in keyboard focus. Keyboard users move
+selection with `C-n`, `C-p`, or the arrow keys and paste the selected item with
+Return or Control-Return. Pointer and accessibility activation continue to
+invoke the row contract. This avoids maintaining separate selected and focused
+rows. A `FocusState` synchronization layer was rejected because lazy off-screen
+rows may not exist when selection changes, and a row-local Space handler was
+rejected because its ordering relative to the button's built-in activation is
+not part of the API contract.
 
 Automated tests will exercise this same contract without traversing the runtime
 accessibility hierarchy. The SwiftUI-to-AppKit accessibility bridge and
@@ -86,6 +109,9 @@ Positive:
 - Input queued during a long main-thread stall cannot replay all the way to the
   end of the list.
 - Mouse activation and row semantics share one explicit, deterministic contract.
+- The panel does not become interactive using navigation IDs carried over from
+  a previous presentation.
+- A previously focused row cannot override the selected row through bare Space.
 
 Negative:
 
@@ -93,12 +119,19 @@ Negative:
   deliberately.
 - A user holding a movement key during a stall may see fewer moves than the
   number of generated repeat events.
+- Each presentation performs one synchronous identifier-only fetch.
+- Full Keyboard Access cannot move keyboard focus onto a history row; the
+  viewer's navigation and Return bindings are the keyboard interaction path.
 
 Risks:
 
 - Removing or misattaching a SwiftUI accessibility modifier can pass the
   contract tests. Release verification must therefore cover the emitted role,
   label, selected state, focus traversal, and activation.
+- Disabling keyboard focus must not remove history rows from VoiceOver traversal
+  or prevent VoiceOver activation.
+- Identifier snapshot latency must be checked with a large history so the
+  correctness boundary does not create a panel-open stall.
 - The 100 ms threshold is intentionally UX policy rather than a platform
   constant. Tests fix its boundary behavior so future changes are explicit.
 
@@ -115,10 +148,16 @@ that a fresh repeat is dispatched, a stale repeat is discarded, and a stale
 non-repeat is still dispatched. This covers the timestamp subtraction and
 `event.isARepeat` wiring rather than only the pure policy.
 
+Presentation tests must cover newest-first identifier ordering, replacement of
+stale IDs, empty history, and snapshot failure without showing the panel. A
+1,000-item presentation profile must confirm that the identifier snapshot does
+not materially regress panel-open latency.
+
 A signed local ordered-`NSWindow` fixture on macOS 26.5.1 verified the runtime
 bridge with Xcode 16.4 and 26.4: rows exposed the `AXButton` role and clip title,
 reflected selection, and routed accessibility activation to the item callback.
-This fixture did not exercise VoiceOver or the real nonactivating `ViewerPanel`.
+This historical fixture predates keyboard-focus suppression and did not exercise
+VoiceOver or the real nonactivating `ViewerPanel`.
 
 The 16 ms cancellable `SelectionScroller` was also confirmed manually during
 the profiling run above to issue one terminal scroll during rapid navigation.
@@ -127,4 +166,11 @@ Before release, and whenever row accessibility semantics change, use VoiceOver
 to verify that focus traverses the rows; the clip title, button role, and
 selected state are announced; `C-n` / `C-p` updates the announced selection;
 and VO-Space activation on another row pastes the expected original-format
-item.
+item. With Full Keyboard Access enabled, verify that rows do not retain keyboard
+focus, bare Space does not paste a stale row, Return pastes the selected row,
+and the history-control buttons still accept Space.
+
+Keyboard-focus suppression is not complete and must not be merged until an app
+built with Xcode 16.4 passes this checklist on a macOS 14 runtime. If disabling
+keyboard focus prevents VoiceOver traversal or activation, do not adopt
+`.focusable(false)`; revisit the focus design instead.
