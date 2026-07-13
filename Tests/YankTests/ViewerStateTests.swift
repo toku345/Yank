@@ -280,4 +280,16 @@ final class ViewerStateTests: XCTestCase {
 
         XCTAssertEqual(state.selectedID, ids[0])
     }
+
+    func testOneHundredMovesInLargeHistory_advancesOneHundredRows() throws {
+        let ids = try makeItemIDs(count: 1_000)
+        state.itemIDs = ids
+        state.selectedID = ids[0]
+
+        for _ in 0..<100 {
+            state.perform(.move(.down))
+        }
+
+        XCTAssertEqual(state.selectedID, ids[100])
+    }
 }

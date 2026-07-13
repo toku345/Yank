@@ -4,29 +4,100 @@ import UniformTypeIdentifiers
 
 struct HistoryListView: View {
     let items: [ClipItem]
-    @Binding var selectedID: PersistentIdentifier?
+    @Bindable var viewerState: ViewerState
     var onItemTap: ((ClipItem) -> Void)?
 
     var body: some View {
         ScrollViewReader { proxy in
-            List(selection: $selectedID) {
-                ForEach(items) { item in
-                    HistoryRow(item: item)
-                        .tag(item.persistentModelID)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(items) { item in
+                        HistoryRowButton(
+                            item: item,
+                            viewerState: viewerState,
+                            onItemTap: onItemTap
+                        )
                         .id(item.persistentModelID)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            onItemTap?(item)
-                        }
+                    }
                 }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
             }
-            .listStyle(.plain)
-            .onChange(of: selectedID) { _, newID in
-                if let id = newID {
-                    proxy.scrollTo(id)
-                }
+            .background {
+                SelectionScroller(proxy: proxy, viewerState: viewerState)
             }
         }
+    }
+}
+
+private struct SelectionScroller: View {
+    let proxy: ScrollViewProxy
+    @Bindable var viewerState: ViewerState
+
+    var body: some View {
+        Color.clear
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
+            .task(id: viewerState.selectedID) {
+                guard let id = viewerState.selectedID else { return }
+                do {
+                    try await Task.sleep(for: .milliseconds(16))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                proxy.scrollTo(id, anchor: .center)
+            }
+    }
+}
+
+@MainActor
+struct HistoryRowContract {
+    let item: ClipItem
+    let viewerState: ViewerState
+    let onActivate: ((ClipItem) -> Void)?
+
+    var accessibilityLabel: String {
+        item.title
+    }
+
+    var isSelected: Bool {
+        viewerState.selectedID == item.persistentModelID
+    }
+
+    func activate() {
+        viewerState.selectedID = item.persistentModelID
+        onActivate?(item)
+    }
+}
+
+private struct HistoryRowButton: View {
+    let item: ClipItem
+    @Bindable var viewerState: ViewerState
+    var onItemTap: ((ClipItem) -> Void)?
+
+    var body: some View {
+        let contract = HistoryRowContract(
+            item: item,
+            viewerState: viewerState,
+            onActivate: onItemTap
+        )
+
+        Button(action: contract.activate) {
+            HistoryRow(item: item)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(contract.isSelected ? Color.accentColor.opacity(0.18) : .clear)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .accessibilityLabel(Text(contract.accessibilityLabel))
+        .accessibilityAddTraits(contract.isSelected ? .isSelected : [])
     }
 }
 

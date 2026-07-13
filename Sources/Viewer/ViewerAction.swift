@@ -20,6 +20,23 @@ enum ViewerAction: Equatable {
     case close
 }
 
+enum ViewerActionDispatchPolicy {
+    static let maximumMoveRepeatAge: TimeInterval = 0.1
+
+    /// - Parameter age: Elapsed time since the event was posted, computed by the
+    ///   caller as a single value from one monotonic clock (system uptime). Taking
+    ///   a precomputed age rather than two raw timestamps keeps the policy from
+    ///   ever mixing incompatible time bases.
+    static func shouldDispatch(
+        action: ViewerAction,
+        isRepeat: Bool,
+        age: TimeInterval
+    ) -> Bool {
+        guard isRepeat, case .move = action else { return true }
+        return age <= maximumMoveRepeatAge
+    }
+}
+
 @Observable
 @MainActor
 final class ViewerState {

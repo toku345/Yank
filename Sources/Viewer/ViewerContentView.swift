@@ -14,7 +14,7 @@ struct ViewerContentView: View {
     @Query(sort: \ClipItem.createdAt, order: .reverse)
     private var clipItems: [ClipItem]
 
-    @Bindable var viewerState: ViewerState
+    let viewerState: ViewerState
     @State private var isClearingHistory = false
 
     let onPaste: (ClipItem, PasteFormat) -> Void
@@ -32,14 +32,18 @@ struct ViewerContentView: View {
             } else {
                 HistoryListView(
                     items: clipItems,
-                    selectedID: $viewerState.selectedID,
+                    viewerState: viewerState,
                     onItemTap: { item in
                         onPaste(item, .original)
                     }
                 )
             }
             Divider()
-            historyControls
+            HistoryControls(
+                viewerState: viewerState,
+                hasItems: !clipItems.isEmpty,
+                isClearingHistory: isClearingHistory
+            )
         }
         .frame(minWidth: 350, idealWidth: 400, minHeight: 300, idealHeight: 500)
         .onChange(of: viewerState.pendingAction) { _, action in
@@ -55,22 +59,28 @@ struct ViewerContentView: View {
         }
     }
 
-    private var historyControls: some View {
-        HStack {
-            Button("Delete Selected") {
-                viewerState.perform(.deleteSelected)
-            }
-            .disabled(viewerState.selectedID == nil || isClearingHistory)
+    private struct HistoryControls: View {
+        @Bindable var viewerState: ViewerState
+        let hasItems: Bool
+        let isClearingHistory: Bool
 
-            Spacer()
+        var body: some View {
+            HStack {
+                Button("Delete Selected") {
+                    viewerState.perform(.deleteSelected)
+                }
+                .disabled(viewerState.selectedID == nil || isClearingHistory)
 
-            Button("Clear All", role: .destructive) {
-                viewerState.perform(.clearHistory)
+                Spacer()
+
+                Button("Clear All", role: .destructive) {
+                    viewerState.perform(.clearHistory)
+                }
+                .disabled(!hasItems || isClearingHistory)
             }
-            .disabled(clipItems.isEmpty || isClearingHistory)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
     }
 
     private func handleViewAction(_ action: ViewerAction) {
