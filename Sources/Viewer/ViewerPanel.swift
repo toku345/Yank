@@ -40,9 +40,9 @@ final class ViewerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     // Intercept key events at the window level before the responder chain.
-    // SwiftUI Button rows in the history list can hold first-responder and
-    // swallow keyDown, so Emacs bindings must be caught here rather than left
-    // to the responder chain.
+    // SwiftUI controls inside the panel can hold first-responder and swallow
+    // keyDown, so Emacs bindings must be caught here rather than left to the
+    // responder chain.
     override func sendEvent(_ event: NSEvent) {
         if event.type == .flagsChanged {
             trackedModifiers = event.modifierFlags

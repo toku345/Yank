@@ -153,6 +153,14 @@ stale IDs, empty history, and snapshot failure without showing the panel. A
 1,000-item presentation profile must confirm that the identifier snapshot does
 not materially regress panel-open latency.
 
+An Xcode 16.4 `XCTClockMetric` run on macOS 26.5.1 measured `show()` against a
+temporary on-disk SwiftData store containing 1,000 synthetic text clips. The
+presenter was replaced with a no-op to isolate the identifier snapshot, state
+synchronization, and panel preparation from WindowServer effects. The first
+presentation took 0.484 ms; four subsequent presentations took 0.255-0.322 ms,
+for a five-run mean of 0.325 ms. This is below one millisecond and does not
+materially regress panel-open latency.
+
 A signed local ordered-`NSWindow` fixture on macOS 26.5.1 verified the runtime
 bridge with Xcode 16.4 and 26.4: rows exposed the `AXButton` role and clip title,
 reflected selection, and routed accessibility activation to the item callback.
