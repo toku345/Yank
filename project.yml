@@ -30,8 +30,9 @@ targets:
       properties:
         CFBundleDisplayName: Yank
         CFBundleName: Yank
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.utilities
         LSUIElement: true
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         NSAccessibilityUsageDescription: >-
@@ -46,8 +47,15 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.toku345.Yank
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_ENTITLEMENTS: SupportingFiles/Yank.entitlements
         ENABLE_HARDENED_RUNTIME: true
+      configs:
+        Release:
+          # Distribution builds must not inherit the debugger entitlement.
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+          ENABLE_CODE_COVERAGE: NO
     postCompileScripts:
       - script: |
           if [ "$YANK_SKIP_SWIFTLINT" = "1" ]; then
@@ -78,3 +86,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.toku345.YankTests
         GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Yank-Production:
+    build:
+      targets:
+        Yank: all
+    run:
+      config: Release
+    profile:
+      config: Release
+    analyze:
+      config: Release
+    archive:
+      config: Release
+      customArchiveName: Yank
+      revealArchiveInOrganizer: false

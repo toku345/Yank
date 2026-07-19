@@ -37,12 +37,13 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build
+      - name: Build production configuration
         run: |
           xcodebuild -project Yank.xcodeproj \
-            -scheme Yank \
-            -configuration Debug \
-            -destination 'platform=macOS' \
+            -scheme Yank-Production \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
             build
 
       - name: Test
