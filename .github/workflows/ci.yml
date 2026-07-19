@@ -50,18 +50,24 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Verify unsigned build is rejected
+      - name: Verify ad-hoc signed build is rejected
         run: |
           app_path="DerivedData/Build/Products/Release/Yank.app"
           [[ -d "${app_path}" ]] || {
             echo "error: built app not found at ${app_path}" >&2
             exit 1
           }
-          if scripts/verify-production-app.sh "${app_path}"; then
-            echo "error: verify-production-app.sh accepted an unsigned build" >&2
+          codesign --force -s - "${app_path}"
+          if output="$(scripts/verify-production-app.sh "${app_path}" 2>&1)"; then
+            echo "error: verify-production-app.sh accepted an ad-hoc signed build" >&2
             exit 1
           fi
-          echo "verify-production-app.sh rejected the unsigned build as expected"
+          grep -Fq 'ad-hoc signatures are not accepted' <<<"${output}" || {
+            echo "error: verifier rejected the build for an unexpected reason:" >&2
+            echo "${output}" >&2
+            exit 1
+          }
+          echo "verify-production-app.sh rejected the ad-hoc signature as expected"
 
       - name: Test
         run: |
