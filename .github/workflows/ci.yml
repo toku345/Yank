@@ -29,21 +29,45 @@ jobs:
           swift --version
 
       - name: Install tools
-        run: brew install xcodegen swiftlint
+        run: brew install xcodegen swiftlint shellcheck
 
       - name: Lint
         run: swiftlint lint --strict
 
+      - name: Lint shell scripts
+        run: shellcheck scripts/*.sh
+
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build
+      - name: Build production configuration
         run: |
           xcodebuild -project Yank.xcodeproj \
-            -scheme Yank \
-            -configuration Debug \
-            -destination 'platform=macOS' \
+            -scheme Yank-Production \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Verify ad-hoc signed build is rejected
+        run: |
+          app_path="DerivedData/Build/Products/Release/Yank.app"
+          [[ -d "${app_path}" ]] || {
+            echo "error: built app not found at ${app_path}" >&2
+            exit 1
+          }
+          codesign --force -s - "${app_path}"
+          if output="$(scripts/verify-production-app.sh "${app_path}" 2>&1)"; then
+            echo "error: verify-production-app.sh accepted an ad-hoc signed build" >&2
+            exit 1
+          fi
+          grep -Fq 'ad-hoc signatures are not accepted' <<<"${output}" || {
+            echo "error: verifier rejected the build for an unexpected reason:" >&2
+            echo "${output}" >&2
+            exit 1
+          }
+          echo "verify-production-app.sh rejected the ad-hoc signature as expected"
 
       - name: Test
         run: |

@@ -39,6 +39,13 @@ Inject signing settings through a two-level xcconfig indirection, applied to the
 
 Setup steps live in `docs/dev-signing.md`.
 
+For an explicitly requested local Production install, `scripts/build-production.sh`
+passes `-xcconfig SupportingFiles/Base.xcconfig` to that single Release archive
+invocation. The project-level mapping remains Debug-only, so ordinary Release and
+archive actions still cannot pick up a developer's identity accidentally. The
+Production invocation also disables base-entitlement injection so
+`com.apple.security.get-task-allow` is absent from the installed app.
+
 ## Consequences
 
 **Positive:**
@@ -50,6 +57,8 @@ Setup steps live in `docs/dev-signing.md`.
 - Personal Team IDs never enter the repository.
 - Debug-only scoping keeps personal development identities out of Release and
   archive builds.
+- Local Production installs can reuse the stable Apple Development identity
+  without changing the signing behavior of ordinary Release/archive actions.
 
 **Negative:**
 

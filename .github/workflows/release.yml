@@ -1,0 +1,238 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ vars.PUBLIC_RELEASES_ENABLED == 'true' }}
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Initialize release paths
+        run: |
+          {
+            printf 'ARCHIVE_PATH=%s\n' "${RUNNER_TEMP}/Yank.xcarchive"
+            printf 'RELEASE_DIR=%s\n' "${RUNNER_TEMP}/release"
+            printf 'KEYCHAIN_PATH=%s\n' "${RUNNER_TEMP}/yank-signing.keychain-db"
+          } >> "${GITHUB_ENV}"
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release tag
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: release tags must match vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+          git fetch origin main --no-tags
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "error: release tag must point to a commit on main" >&2
+            exit 1
+          fi
+
+      - name: Install tools
+        run: brew install xcodegen swiftlint
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Validate project version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          project_version="$(xcodebuild \
+            -project Yank.xcodeproj \
+            -scheme Yank-Production \
+            -configuration Release \
+            -showBuildSettings \
+            | awk '$1 == "MARKETING_VERSION" && $2 == "=" { print $3; exit }')"
+          project_build="$(xcodebuild \
+            -project Yank.xcodeproj \
+            -scheme Yank-Production \
+            -configuration Release \
+            -showBuildSettings \
+            | awk '$1 == "CURRENT_PROJECT_VERSION" && $2 == "=" { print $3; exit }')"
+          if [[ "${tag_version}" != "${project_version}" ]]; then
+            echo "error: tag ${tag_version} does not match project version ${project_version}" >&2
+            exit 1
+          fi
+          if [[ ! "${project_build}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "error: CURRENT_PROJECT_VERSION must be a positive integer" >&2
+            exit 1
+          fi
+          echo "YANK_RELEASE_VERSION=${tag_version}" >> "${GITHUB_ENV}"
+          echo "YANK_RELEASE_BUILD=${project_build}" >> "${GITHUB_ENV}"
+
+      - name: Test
+        run: ./scripts/check.sh
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          umask 077
+          : "${CERTIFICATE_BASE64:?DEVELOPER_ID_CERTIFICATE_BASE64 is required}"
+          : "${CERTIFICATE_PASSWORD:?DEVELOPER_ID_CERTIFICATE_PASSWORD is required}"
+
+          certificate_path="${RUNNER_TEMP}/developer-id-application.p12"
+          printf '%s' "${CERTIFICATE_BASE64}" | base64 --decode > "${certificate_path}"
+
+          keychain_password="$(uuidgen)$(uuidgen)"
+          echo "::add-mask::${keychain_password}"
+
+          security create-keychain -p "${keychain_password}" "${KEYCHAIN_PATH}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+          security unlock-keychain -p "${keychain_password}" "${KEYCHAIN_PATH}"
+          security import "${certificate_path}" \
+            -k "${KEYCHAIN_PATH}" \
+            -P "${CERTIFICATE_PASSWORD}" \
+            -T /usr/bin/codesign
+          rm -f "${certificate_path}"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "${keychain_password}" \
+            "${KEYCHAIN_PATH}"
+
+          keychains=("${KEYCHAIN_PATH}")
+          while IFS= read -r keychain; do
+            keychain="${keychain#*\"}"
+            keychain="${keychain%\"*}"
+            [[ -n "${keychain}" ]] && keychains+=("${keychain}")
+          done < <(security list-keychains -d user)
+          security list-keychains -d user -s "${keychains[@]}"
+
+          security find-identity -v -p codesigning "${KEYCHAIN_PATH}" \
+            | grep -F '"Developer ID Application:'
+
+      - name: Archive Developer ID signed app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          YANK_SKIP_SWIFTLINT: "1"
+        run: |
+          : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required}"
+          xcodebuild \
+            -project Yank.xcodeproj \
+            -scheme Yank-Production \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath "${ARCHIVE_PATH}" \
+            DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='Developer ID Application' \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+            ENABLE_CODE_COVERAGE=NO \
+            OTHER_CODE_SIGN_FLAGS='--timestamp' \
+            archive
+
+      - name: Verify Developer ID signature
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          app_path="${ARCHIVE_PATH}/Products/Applications/Yank.app"
+          YANK_EXPECTED_VERSION="${YANK_RELEASE_VERSION}" \
+            YANK_EXPECTED_BUILD="${YANK_RELEASE_BUILD}" \
+            ./scripts/verify-production-app.sh "${app_path}"
+
+          signature_info="$(codesign -dv --verbose=4 "${app_path}" 2>&1)"
+          grep -Fq 'Authority=Developer ID Application:' <<<"${signature_info}"
+          grep -Fq "TeamIdentifier=${APPLE_TEAM_ID}" <<<"${signature_info}"
+
+      - name: Discard signing identity
+        run: |
+          security lock-keychain "${KEYCHAIN_PATH}"
+          security delete-keychain "${KEYCHAIN_PATH}"
+
+      - name: Submit for notarization
+        env:
+          NOTARY_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          umask 077
+          : "${NOTARY_KEY_BASE64:?APP_STORE_CONNECT_API_KEY_BASE64 is required}"
+          : "${NOTARY_KEY_ID:?APP_STORE_CONNECT_KEY_ID is required}"
+          : "${NOTARY_ISSUER_ID:?APP_STORE_CONNECT_ISSUER_ID is required}"
+
+          app_path="${ARCHIVE_PATH}/Products/Applications/Yank.app"
+          notary_archive="${RUNNER_TEMP}/Yank-notarization.zip"
+          notary_key="${RUNNER_TEMP}/AuthKey.p8"
+
+          ditto -c -k --sequesterRsrc --keepParent "${app_path}" "${notary_archive}"
+          printf '%s' "${NOTARY_KEY_BASE64}" | base64 --decode > "${notary_key}"
+
+          xcrun notarytool submit "${notary_archive}" \
+            --key "${notary_key}" \
+            --key-id "${NOTARY_KEY_ID}" \
+            --issuer "${NOTARY_ISSUER_ID}" \
+            --wait
+
+          rm -f "${notary_key}" "${notary_archive}"
+
+      - name: Staple and package release
+        run: |
+          app_path="${ARCHIVE_PATH}/Products/Applications/Yank.app"
+          dsym_path="${ARCHIVE_PATH}/dSYMs/Yank.app.dSYM"
+          release_archive="${RELEASE_DIR}/Yank-${YANK_RELEASE_VERSION}.zip"
+          dsym_archive="${RELEASE_DIR}/Yank-${YANK_RELEASE_VERSION}.dSYM.zip"
+
+          xcrun stapler staple "${app_path}"
+          xcrun stapler validate "${app_path}"
+          YANK_EXPECTED_VERSION="${YANK_RELEASE_VERSION}" \
+            YANK_EXPECTED_BUILD="${YANK_RELEASE_BUILD}" \
+            ./scripts/verify-production-app.sh "${app_path}"
+          spctl --assess --type execute --verbose=4 "${app_path}"
+
+          mkdir -p "${RELEASE_DIR}"
+          ditto -c -k --sequesterRsrc --keepParent "${app_path}" "${release_archive}"
+          ditto -c -k --keepParent "${dsym_path}" "${dsym_archive}"
+          cd "${RELEASE_DIR}" || exit 1
+          shasum -a 256 \
+            "Yank-${YANK_RELEASE_VERSION}.zip" \
+            "Yank-${YANK_RELEASE_VERSION}.dSYM.zip" \
+            > SHA256SUMS
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          expected_sha="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+          remote_tag_commit="$(git ls-remote --tags origin \
+            "refs/tags/${GITHUB_REF_NAME}" \
+            "refs/tags/${GITHUB_REF_NAME}^{}" \
+            | awk '$2 ~ /\^\{\}$/ { peeled = $1 } $2 !~ /\^\{\}$/ { direct = $1 } END { print peeled ? peeled : direct }')"
+          if [[ -z "${remote_tag_commit}" || "${remote_tag_commit}" != "${expected_sha}" ]]; then
+            echo "error: release tag moved or disappeared during the workflow" >&2
+            exit 1
+          fi
+
+          gh release create "${GITHUB_REF_NAME}" \
+            "${RELEASE_DIR}/Yank-${YANK_RELEASE_VERSION}.zip" \
+            "${RELEASE_DIR}/Yank-${YANK_RELEASE_VERSION}.dSYM.zip" \
+            "${RELEASE_DIR}/SHA256SUMS" \
+            --verify-tag \
+            --title "Yank ${YANK_RELEASE_VERSION}" \
+            --generate-notes
+
+      - name: Clean up signing material
+        if: always()
+        run: |
+          security delete-keychain "${KEYCHAIN_PATH}" 2>/dev/null || true
+          rm -f \
+            "${RUNNER_TEMP}/developer-id-application.p12" \
+            "${RUNNER_TEMP}/AuthKey.p8" \
+            "${RUNNER_TEMP}/Yank-notarization.zip"
