@@ -29,10 +29,13 @@ jobs:
           swift --version
 
       - name: Install tools
-        run: brew install xcodegen swiftlint
+        run: brew install xcodegen swiftlint shellcheck
 
       - name: Lint
         run: swiftlint lint --strict
+
+      - name: Lint shell scripts
+        run: shellcheck scripts/*.sh
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -43,8 +46,22 @@ jobs:
             -scheme Yank-Production \
             -configuration Release \
             -destination 'generic/platform=macOS' \
+            -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Verify unsigned build is rejected
+        run: |
+          app_path="DerivedData/Build/Products/Release/Yank.app"
+          [[ -d "${app_path}" ]] || {
+            echo "error: built app not found at ${app_path}" >&2
+            exit 1
+          }
+          if scripts/verify-production-app.sh "${app_path}"; then
+            echo "error: verify-production-app.sh accepted an unsigned build" >&2
+            exit 1
+          fi
+          echo "verify-production-app.sh rejected the unsigned build as expected"
 
       - name: Test
         run: |
