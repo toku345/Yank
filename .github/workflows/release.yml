@@ -17,12 +17,16 @@ jobs:
     if: ${{ vars.PUBLIC_RELEASES_ENABLED == 'true' }}
     runs-on: macos-15
     timeout-minutes: 30
-    env:
-      ARCHIVE_PATH: ${{ runner.temp }}/Yank.xcarchive
-      RELEASE_DIR: ${{ runner.temp }}/release
-      KEYCHAIN_PATH: ${{ runner.temp }}/yank-signing.keychain-db
 
     steps:
+      - name: Initialize release paths
+        run: |
+          {
+            printf 'ARCHIVE_PATH=%s\n' "${RUNNER_TEMP}/Yank.xcarchive"
+            printf 'RELEASE_DIR=%s\n' "${RUNNER_TEMP}/release"
+            printf 'KEYCHAIN_PATH=%s\n' "${RUNNER_TEMP}/yank-signing.keychain-db"
+          } >> "${GITHUB_ENV}"
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
