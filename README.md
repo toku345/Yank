@@ -50,6 +50,42 @@ On first launch, macOS will prompt for **Accessibility permission** (required fo
 
 > **Note:** With the default ad-hoc signing, each debug build changes the code signature and macOS revokes the Accessibility grant. Set up a stable development signing identity (see [docs/dev-signing.md](docs/dev-signing.md)) to keep the permission across builds. If paste still stops working, remove Yank from the Accessibility list and re-add it.
 
+### Local Production Install
+
+To create an optimized, Universal (`arm64` + `x86_64`) Release archive signed
+with your local Apple Development identity and install it in `/Applications`:
+
+```bash
+# One-time signing setup
+open docs/dev-signing.md
+
+# Build, verify, install, and launch /Applications/Yank.app
+./scripts/install-production.sh
+```
+
+The installer fails closed if the app is ad-hoc signed, lacks hardened runtime,
+contains the debugger entitlement, has unexpected metadata, or is missing an
+architecture. It only replaces an existing app whose bundle identifier is
+`com.toku345.Yank`, and refuses an accidental downgrade. Use `--no-launch` to
+install without starting Yank, or `--destination "$HOME/Applications/Yank.app"`
+for a per-user installation. Yank must not be running during replacement.
+
+The first switch from a Debug build to the installed app may require removing
+Yank from **System Settings > Privacy & Security > Accessibility** and granting
+access again.
+
+### Public Releases
+
+Public distribution is currently deferred until Yank has external users; see
+[Issue #53](https://github.com/toku345/Yank/issues/53). The tag workflow remains
+dormant unless the `PUBLIC_RELEASES_ENABLED` repository variable is explicitly
+set to `true`. Once enabled, pushing a semantic version tag such as `v0.1.0`
+publishes a GitHub Release only after tests, Developer ID signing, notarization,
+stapling, and Gatekeeper verification all succeed. Required secrets and the
+release checklist are documented in [docs/releasing.md](docs/releasing.md).
+Unsigned or Apple Development-signed builds are not published as release
+artifacts.
+
 ### Keybindings
 
 | Key | Action |
