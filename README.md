@@ -2,6 +2,13 @@
 
 A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Clipy). Built with SwiftUI + SwiftData, no runtime dependencies.
 
+## Project Status
+
+- **Current app version in source:** `0.1.0` (no public version tag or GitHub Release has been published)
+- **Active milestone:** [0.2.0 — Snippet management](https://github.com/toku345/Yank/milestone/1)
+- **Current focus:** [#32 Add snippet data models](https://github.com/toku345/Yank/issues/32)
+- **Public distribution:** Deferred; see [Issue #53](https://github.com/toku345/Yank/issues/53)
+
 ## Features
 
 ### Implemented (Phase 1 MVP)
@@ -13,12 +20,13 @@ A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Cli
 - **Self-paste suppression** — Yank's own paste operations are excluded from history
 - **Duplicate detection** — consecutive identical clipboard contents are deduplicated
 - **History deletion controls** — delete the selected history item or clear all saved history
+- **Menu bar app** — status item with About and Quit actions
 
 ### Planned
 
 - **Snippet management** — folder-organized snippets with C-f/C-b tab switching (Phase 2)
 - **Clipy snippet import** — import existing Clipy XML snippets (Phase 2)
-- **Status bar icon** — MenuBarExtra for quick access and settings (Phase 3)
+- **Expanded menu bar controls and settings** — viewer access and usable preferences from the menu bar (Phase 3)
 - **Sensitive value handling** — sensitive classification and auto-delete after paste (Phase 3)
 - **Launch at login** — via SMAppService (Phase 3)
 - **Search** — incremental search with C-s (Phase 3)
@@ -131,7 +139,9 @@ remaining limitations.
 
 ## Architecture
 
-See [PLAN.md](PLAN.md) for the full development plan and [docs/adr/](docs/adr/) for architecture decision records.
+See [PLAN.md](PLAN.md) for long-term product direction and phase outcomes, and
+[docs/adr/](docs/adr/) for architecture decisions. Live delivery status is
+tracked in [GitHub Issues](https://github.com/toku345/Yank/issues) and milestones.
 
 ## Acknowledgements
 
