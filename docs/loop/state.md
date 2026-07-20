@@ -1,28 +1,24 @@
 # Yank Loop State
 
-This file records owner-accepted loop engineering decisions for Yank.
+This file records owner-accepted decisions about the Yank engineering loop. It
+is not a backlog or progress tracker.
 
-Automation should not update this file directly. Use automation output as an inbox item, then copy only the accepted decisions here after human review.
+Automation may propose candidates but must not update this file directly. Only
+decisions accepted by the owner after human review belong here. Routine Issue
+status changes and closures do not require updates.
 
-## Current Phase
+## Accepted Owner Decisions
 
-- Phase 1 MVP is implemented.
-- Phase 2 snippet management is the next major product milestone.
-- Loop engineering is starting with read-only weekly triage.
+- GitHub Issues and milestones are the canonical source for live scope,
+  acceptance criteria, dependencies, status, and implementation order.
+- At roadmap adoption, the owner selected
+  [#32 Add snippet data models](https://github.com/toku345/Yank/issues/32) as
+  the initial Phase 2 delivery slice.
+- `README.md` exposes only a short public status summary.
+- `PLAN.md` records long-term direction and phase outcomes rather than live
+  progress.
 
-## Accepted Candidates
+## Triage Policy
 
-- None yet.
-
-## Rejected Or Deferred Candidates
-
-- None yet.
-
-## Open Questions
-
-- Which Phase 2 slice should be implemented first after triage is stable?
-- Should GitHub Issues become the canonical backlog for Phase 2 slices?
-
-## Last Triage Summary
-
-- Not run yet.
+- Weekly triage is read-only and may propose candidate Issues.
+- A triage result remains a proposal until the owner explicitly accepts it.
