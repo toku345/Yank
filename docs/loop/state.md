@@ -11,11 +11,9 @@ status changes and closures do not require updates.
 
 - GitHub Issues and milestones are the canonical source for live scope,
   acceptance criteria, dependencies, status, and implementation order.
-- [0.2.0 — Snippet management](https://github.com/toku345/Yank/milestone/1) is
-  the active product milestone.
-- The owner selected
+- At roadmap adoption, the owner selected
   [#32 Add snippet data models](https://github.com/toku345/Yank/issues/32) as
-  the first Phase 2 delivery slice.
+  the initial Phase 2 delivery slice.
 - `README.md` exposes only a short public status summary.
 - `PLAN.md` records long-term direction and phase outcomes rather than live
   progress.
