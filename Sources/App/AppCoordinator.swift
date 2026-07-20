@@ -15,7 +15,7 @@ final class AppCoordinator {
     func start() {
         checkAccessibility()
 
-        let schema = Schema([ClipItem.self, SnippetFolder.self, Snippet.self])
+        let schema = YankSchema.current
         let config = ModelConfiguration("Yank", schema: schema)
 
         let container: ModelContainer

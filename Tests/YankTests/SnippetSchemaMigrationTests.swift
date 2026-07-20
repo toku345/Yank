@@ -13,7 +13,7 @@ final class SnippetSchemaMigrationTests: XCTestCase {
         let storeURL = directory.appendingPathComponent("Yank.store")
         try createLegacyStore(at: storeURL)
 
-        let schema = Schema([ClipItem.self, SnippetFolder.self, Snippet.self])
+        let schema = YankSchema.current
         let config = ModelConfiguration("Yank", schema: schema, url: storeURL)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)

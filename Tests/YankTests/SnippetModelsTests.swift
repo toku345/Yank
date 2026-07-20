@@ -66,6 +66,23 @@ final class SnippetModelsTests: XCTestCase {
         XCTAssertTrue(snippets.allSatisfy { $0.folder.persistentModelID == folder.persistentModelID })
     }
 
+    func testSnippetSortOrderIsScopedByFolder() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let shellFolder = SnippetFolder(title: "Shell", sortOrder: 0)
+        let gitFolder = SnippetFolder(title: "Git", sortOrder: 1)
+        context.insert(shellFolder)
+        context.insert(gitFolder)
+        context.insert(Snippet(title: "Shell second", content: "shell 2", sortOrder: 1, folder: shellFolder))
+        context.insert(Snippet(title: "Git second", content: "git 2", sortOrder: 1, folder: gitFolder))
+        context.insert(Snippet(title: "Shell first", content: "shell 1", sortOrder: 0, folder: shellFolder))
+        context.insert(Snippet(title: "Git first", content: "git 1", sortOrder: 0, folder: gitFolder))
+        try context.save()
+
+        XCTAssertEqual(try snippetTitles(in: shellFolder, from: container), ["Shell first", "Shell second"])
+        XCTAssertEqual(try snippetTitles(in: gitFolder, from: container), ["Git first", "Git second"])
+    }
+
     func testDeletingFolderCascadesOnlyItsSnippets() throws {
         let container = try makeContainer()
 
@@ -91,5 +108,16 @@ final class SnippetModelsTests: XCTestCase {
         let snippets = try ModelContext(container).fetch(FetchDescriptor<Snippet>())
         XCTAssertEqual(folders.map(\.title), ["Keep"])
         XCTAssertEqual(snippets.map(\.title), ["Retained"])
+    }
+
+    private func snippetTitles(in folder: SnippetFolder, from container: ModelContainer) throws -> [String] {
+        let folderID = folder.persistentModelID
+        let descriptor = FetchDescriptor<Snippet>(
+            sortBy: [SortDescriptor(\Snippet.sortOrder)]
+        )
+        let snippets = try ModelContext(container).fetch(descriptor)
+        return snippets
+            .filter { $0.folder.persistentModelID == folderID }
+            .map(\.title)
     }
 }
