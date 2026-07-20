@@ -23,7 +23,7 @@ You are triaging the Yank repository. Your job is to identify a small number of 
 4. Inspect repository state: `.github/workflows/ci.yml`, `git status --short`, and recent commits.
 5. Search for concrete signals with `rg`, including `TODO`, `FIXME`, `Phase 2`, `Snippet`, `C-f`, `C-b`, `sensitive`, `login`, and `search`.
 
-If live GitHub state is unavailable, report the missing verification and label any candidates derived from local sources as provisional. Do not rank them, recommend a single best next action, or claim their Issue status or milestone membership is current until live GitHub state is verified.
+If live GitHub state is unavailable, report the missing verification and label any candidates derived from local sources as provisional. Do not rank them, recommend one as current work, or claim their Issue status or milestone membership is current until live GitHub state is verified.
 
 ## Output
 
@@ -36,4 +36,4 @@ Return at most 3 candidates. For each candidate include:
 - Missing verification
 - Owner decision point, if any
 
-End with a short recommendation for the single best next action. If there is no actionable work, say so and explain what evidence supports that conclusion.
+When live GitHub state is verified, end with a short recommendation for the single best next action. Otherwise, end with the missing verification needed to validate the provisional candidates. If there is no actionable work, say so and explain what evidence supports that conclusion.
