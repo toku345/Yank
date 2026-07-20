@@ -15,26 +15,19 @@
 Yank は macOS 14+ 向けのクリップボードマネージャです。
 Clipy の後継を意識し、SwiftUI + SwiftData + Carbon API を中心に、外部ランタイム依存なしで構築します。
 
-プロダクトの各 Phase と完了条件は `PLAN.md` に記録します。公開向けの短い
-現在状況は `README.md` の Project Status、実作業の状態は GitHub Issues と
-Milestones を参照してください。
+プロダクトの各 Phase と完了条件は `PLAN.md` に記録します。公開向けの短い現在状況は `README.md` の Project Status、実作業の状態は GitHub Issues と Milestones を参照してください。
 
 ## Planning Sources of Truth
 
 計画情報は、用途ごとに次の場所を正本とします。
 
-- **GitHub Issues と Milestones**: 実作業の scope、acceptance criteria、依存関係、
-  status、assignment、実装順序。
-- **`README.md` / Project Status**: source 上の app version、active milestone、
-  owner が選んだ current focus、public release status だけを示す短い公開 snapshot。
-- **`PLAN.md`**: 長期的なプロダクト方針、各 Phase の outcome、完了条件。これらの
-  目標が変わる場合だけ更新する。
-- **`docs/loop/state.md`**: owner が承認した loop 運用上の判断。Automation は提案のみ
-  行い、直接更新しない。通常の Issue 進行や close では更新しない。
+- **GitHub Issues と Milestones**: 実作業の scope、acceptance criteria、依存関係、status、assignment、実装順序。Milestones には version outcome を表す Issues だけを含め、PR は対応する Issue に紐付ける。Maintenance PR は milestone outcome を block する場合を除き Milestone の対象外とする。
+- **`README.md` / Project Status**: source 上の app version、active milestone、owner が選んだ current focus、public release status だけを示す短い公開 snapshot。
+- **`PLAN.md`**: 長期的なプロダクト方針、各 Phase の outcome、完了条件。これらの目標が変わる場合だけ更新する。
+- **`docs/loop/state.md`**: owner が承認した loop 運用上の判断。Automation は提案のみ行い、直接更新しない。通常の Issue 進行や close では更新しない。
 - **`docs/adr/`**: 長期的に残すアーキテクチャ・設計判断。
 
-計画上の status を変更する前に live GitHub state と照合し、複数のファイルへ
-backlog、完了状況、実装順序を重複して記録しないでください。
+計画上の status を変更する前に live GitHub state と照合し、複数のファイルへ backlog、完了状況、実装順序を重複して記録しないでください。
 
 ## Requirements
 
