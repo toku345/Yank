@@ -18,9 +18,12 @@ You are triaging the Yank repository. Your job is to identify a small number of 
 ## Context To Inspect
 
 1. Read active repository guidance once from `AGENTS.md` / `CLAUDE.md`.
-2. Inspect product state: `README.md`, `PLAN.md`, and `docs/adr/`.
-3. Inspect delivery state: `.github/workflows/ci.yml`, `git status --short`, and recent commits.
-4. Search for concrete signals with `rg`, including `TODO`, `FIXME`, `Phase 2`, `Snippet`, `C-f`, `C-b`, `sensitive`, `login`, and `search`.
+2. Inspect live GitHub delivery state before proposing candidates: the active milestone, its open Issues, and each relevant Issue's status, priority, dependencies, assignment, and acceptance criteria. Treat GitHub Issues and Milestones as canonical for live scope and ordering.
+3. Inspect product context: `README.md`, `PLAN.md`, and `docs/adr/`.
+4. Inspect repository state: `.github/workflows/ci.yml`, `git status --short`, and recent commits.
+5. Search for concrete signals with `rg`, including `TODO`, `FIXME`, `Phase 2`, `Snippet`, `C-f`, `C-b`, `sensitive`, `login`, and `search`.
+
+If live GitHub state is unavailable, do not infer a current recommendation from local sources. Report the unavailable verification and stop after summarizing any non-current local evidence.
 
 ## Output
 
