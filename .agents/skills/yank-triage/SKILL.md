@@ -23,7 +23,7 @@ You are triaging the Yank repository. Your job is to identify a small number of 
 4. Inspect repository state: `.github/workflows/ci.yml`, `git status --short`, and recent commits.
 5. Search for concrete signals with `rg`, including `TODO`, `FIXME`, `Phase 2`, `Snippet`, `C-f`, `C-b`, `sensitive`, `login`, and `search`.
 
-If live GitHub state is unavailable, do not infer a current recommendation from local sources. Report the unavailable verification and stop after summarizing any non-current local evidence.
+If live GitHub state is unavailable, report the missing verification and label any candidates derived from local sources as provisional. Do not rank them, recommend a single best next action, or claim their Issue status or milestone membership is current until live GitHub state is verified.
 
 ## Output
 
