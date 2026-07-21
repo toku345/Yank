@@ -13,23 +13,29 @@ final class SnippetSchemaMigrationTests: XCTestCase {
         let storeURL = directory.appendingPathComponent("Yank.store")
         try createLegacyStore(at: storeURL)
 
+        try autoreleasepool {
+            let context = ModelContext(try openCurrentStore(at: storeURL))
+
+            let clip = try XCTUnwrap(context.fetch(FetchDescriptor<ClipItem>()).first)
+            XCTAssertEqual(clip.title, "Existing clip")
+            XCTAssertEqual(clip.stringValue, "preserve me")
+
+            let folder = SnippetFolder(title: "Migrated", sortOrder: 0)
+            context.insert(folder)
+            context.insert(Snippet(title: "New snippet", content: "new", sortOrder: 0, folder: folder))
+            try context.save()
+        }
+
+        let reopenedContext = ModelContext(try openCurrentStore(at: storeURL))
+        XCTAssertEqual(try reopenedContext.fetchCount(FetchDescriptor<ClipItem>()), 1)
+        XCTAssertEqual(try reopenedContext.fetchCount(FetchDescriptor<SnippetFolder>()), 1)
+        XCTAssertEqual(try reopenedContext.fetchCount(FetchDescriptor<Snippet>()), 1)
+    }
+
+    private func openCurrentStore(at storeURL: URL) throws -> ModelContainer {
         let schema = YankSchema.current
         let config = ModelConfiguration("Yank", schema: schema, url: storeURL)
-        let container = try ModelContainer(for: schema, configurations: [config])
-        let context = ModelContext(container)
-
-        let clip = try XCTUnwrap(context.fetch(FetchDescriptor<ClipItem>()).first)
-        XCTAssertEqual(clip.title, "Existing clip")
-        XCTAssertEqual(clip.stringValue, "preserve me")
-
-        let folder = SnippetFolder(title: "Migrated", sortOrder: 0)
-        context.insert(folder)
-        context.insert(Snippet(title: "New snippet", content: "new", sortOrder: 0, folder: folder))
-        try context.save()
-
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<ClipItem>()), 1)
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<SnippetFolder>()), 1)
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Snippet>()), 1)
+        return try ModelContainer(for: schema, configurations: [config])
     }
 
     private func createLegacyStore(at storeURL: URL) throws {

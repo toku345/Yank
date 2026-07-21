@@ -4,7 +4,7 @@ import XCTest
 
 final class SnippetModelsTests: XCTestCase {
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema([SnippetFolder.self, Snippet.self])
+        let schema = YankSchema.current
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         return try ModelContainer(for: schema, configurations: [config])
     }
