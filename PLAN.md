@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Yank is a keyboard-first clipboard manager for macOS 14 or later. It is inspired
+Yank is a keyboard-first clipboard manager for macOS 15 or later. It is inspired
 by Clipy and uses native macOS frameworks to provide fast clipboard history and
 reusable snippets without external runtime dependencies.
 
@@ -28,7 +28,7 @@ decisions.
 - **Paste execution:** CGEvent-based Cmd+V simulation.
 - **Clipboard monitoring:** `Timer` and `NSPasteboard.changeCount` at a 250 ms interval.
 - **Project generation:** XcodeGen using `project.yml`.
-- **Deployment target:** macOS 14 Sonoma or later.
+- **Deployment target:** macOS 15 Sequoia or later (ADR 0011).
 - **Dependency policy:** Use platform APIs by default. Introduce an external
   dependency only when platform APIs cannot reasonably satisfy a requirement,
   and record that decision in an ADR.
