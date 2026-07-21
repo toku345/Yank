@@ -32,7 +32,10 @@ final class SnippetModelsTests: XCTestCase {
         XCTAssertEqual(fetchedSnippet.title, "List files")
         XCTAssertEqual(fetchedSnippet.content, "rg --files")
         XCTAssertEqual(fetchedSnippet.sortOrder, 0)
-        XCTAssertEqual(fetchedSnippet.folder.persistentModelID, fetchedFolder.persistentModelID)
+        XCTAssertEqual(
+            try XCTUnwrap(fetchedSnippet.folder).persistentModelID,
+            fetchedFolder.persistentModelID
+        )
     }
 
     func testFoldersPersistSortOrder() throws {
@@ -63,7 +66,7 @@ final class SnippetModelsTests: XCTestCase {
         )
         let snippets = try ModelContext(container).fetch(descriptor)
         XCTAssertEqual(snippets.map(\.title), ["First", "Second"])
-        XCTAssertTrue(snippets.allSatisfy { $0.folder.persistentModelID == folder.persistentModelID })
+        XCTAssertTrue(snippets.allSatisfy { $0.folder?.persistentModelID == folder.persistentModelID })
     }
 
     func testSnippetSortOrderIsScopedByFolder() throws {
@@ -117,7 +120,7 @@ final class SnippetModelsTests: XCTestCase {
         )
         let snippets = try ModelContext(container).fetch(descriptor)
         return snippets
-            .filter { $0.folder.persistentModelID == folderID }
+            .filter { $0.folder?.persistentModelID == folderID }
             .map(\.title)
     }
 }

@@ -5,7 +5,9 @@ final class Snippet {
     var title: String
     var content: String
     var sortOrder: Int
-    var folder: SnippetFolder
+    // SwiftData clears the inverse before cascading a folder deletion, so the
+    // persisted relationship must accept nil even though creation requires a folder.
+    var folder: SnippetFolder?
 
     init(title: String, content: String, sortOrder: Int, folder: SnippetFolder) {
         self.title = title

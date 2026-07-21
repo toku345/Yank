@@ -21,18 +21,20 @@ change.
 Add two SwiftData models:
 
 - `SnippetFolder` stores `title`, `sortOrder`, and its `snippets` relationship.
-- `Snippet` stores `title`, plain-text `content`, `sortOrder`, and one required
-  `folder` relationship.
+- `Snippet` stores `title`, plain-text `content`, `sortOrder`, and a `folder`
+  relationship. Creation requires a folder, while the persisted inverse is
+  optional so SwiftData can clear it while cascading a folder deletion.
 
 Folder order is global. Snippet order is scoped to a folder. Both use ascending,
 zero-based, dense `Int` values as their normalized representation. The models
 store the values but do not validate or renumber them; the snippet editor will
 own those operations.
 
-Deleting a folder cascades to its snippets. Snippets cannot exist without a
-folder. Use SwiftData's `PersistentIdentifier` rather than adding domain UUIDs.
-Do not add repositories, CRUD services, or import-specific metadata in this
-slice.
+Deleting a folder cascades to its snippets. Yank does not intentionally create
+unfiled snippets: the initializer requires a folder, even though SwiftData's
+persisted inverse must accept `nil` during cascade processing. Use SwiftData's
+`PersistentIdentifier` rather than adding domain UUIDs. Do not add repositories,
+CRUD services, or import-specific metadata in this slice.
 
 Register `ClipItem`, `SnippetFolder`, and `Snippet` in the application schema.
 Because this change only adds entities and relationships, use SwiftData's
@@ -47,7 +49,8 @@ Positive:
 
 - Later editor, viewer, and import work shares one explicit persistence model.
 - Ordering is queryable and independent of SwiftData relationship-array order.
-- Required ownership and cascade deletion prevent orphaned snippets.
+- Required creation-time ownership and cascade deletion prevent orphaned
+  snippets in supported application flows.
 - The existing clipboard store is preserved through an additive migration.
 
 Negative:
@@ -55,7 +58,9 @@ Negative:
 - Reordering may update several sibling `sortOrder` values.
 - SwiftData does not enforce dense, unique order values within a folder; later
   domain logic must maintain that invariant.
-- Unfiled snippets are not representable.
+- The persisted `folder` relationship is technically optional to support
+  SwiftData cascade processing; later mutation APIs must preserve the ownership
+  invariant.
 
 If the on-disk migration test fails on a supported toolchain, do not delete or
 recreate the user's store. Stop the change and introduce an explicit migration
