@@ -27,7 +27,10 @@ Intel Macs.
 
 Set the deployment target to macOS 15 Sequoia (`MACOSX_DEPLOYMENT_TARGET =
 15.0` via `project.yml`). Update `PLAN.md`, `README.md`, and `CLAUDE.md` to
-state the new floor.
+state the new floor. Raise the stated Xcode requirement in `README.md` to
+16.0+, because building against the macOS 15 floor requires the macOS 15 SDK,
+which first shipped with Xcode 16. Retarget ADR 0009's accessibility merge
+precondition from "a macOS 14 runtime" to the oldest supported runtime.
 
 Close issue #67 as obsolete: with macOS 15 as the floor, the CI runner OS and
 the minimum supported OS coincide, so the cascade-delete path is exercised on
