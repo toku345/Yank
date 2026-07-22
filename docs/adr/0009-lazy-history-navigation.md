@@ -179,6 +179,8 @@ focus, bare Space does not paste a stale row, Return pastes the selected row,
 and the history-control buttons still accept Space.
 
 Keyboard-focus suppression is not complete and must not be merged until an app
-built with Xcode 16.4 passes this checklist on a macOS 14 runtime. If disabling
+built with Xcode 16.4 passes this checklist on the oldest supported macOS
+runtime (macOS 14 at the time of writing; raised to macOS 15 by ADR 0011). If
+disabling
 keyboard focus prevents VoiceOver traversal or activation, do not adopt
 `.focusable(false)`; revisit the focus design instead.

@@ -2,7 +2,7 @@ name: Yank
 options:
   bundleIdPrefix: com.toku345
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "15.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
   developmentLanguage: en
@@ -10,7 +10,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
 
 # 開発者ごとの署名設定の注入口 (issue #11 / ADR 0007)。
 # Debug 限定: 個人の開発証明書を Release/archive に波及させない。

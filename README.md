@@ -33,8 +33,8 @@ A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Cli
 
 ## Requirements
 
-- macOS 14 Sonoma or later
-- Xcode 15.0+
+- macOS 15 Sequoia or later
+- Xcode 16.0+
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 
 ## Getting Started
