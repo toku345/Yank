@@ -49,6 +49,37 @@ final class EmacsKeyHandlerTabShortcutTests: XCTestCase {
         XCTAssertNil(EmacsKeyHandler.handle(event: event, trackedModifiers: []))
     }
 
+    // The tab shortcut requires the exact Cmd+Shift chord; superset chords
+    // must stay inert so a `.contains`-style refactor of the modifier gate
+    // cannot silently widen the shortcut.
+    func testCommandShiftOptionBracket_doesNotSwitchTab() {
+        let event = makeKeyEvent(
+            keyCode: 30,
+            character: "}",
+            modifierFlags: [.command, .shift, .option]
+        )
+        XCTAssertNil(
+            EmacsKeyHandler.handle(
+                event: event,
+                trackedModifiers: [.command, .shift, .option]
+            )
+        )
+    }
+
+    func testCommandControlShiftBracket_doesNotSwitchTab() {
+        let event = makeKeyEvent(
+            keyCode: 30,
+            character: "}",
+            modifierFlags: [.command, .shift, .control]
+        )
+        XCTAssertNil(
+            EmacsKeyHandler.handle(
+                event: event,
+                trackedModifiers: [.command, .shift, .control]
+            )
+        )
+    }
+
     // MARK: - Cmd+Shift chord swallowing
 
     // While the Cmd+Shift chord is held, only the bracket tab shortcuts
