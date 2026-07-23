@@ -6,7 +6,7 @@ A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Cli
 
 - **Current app version in source:** `0.1.0` (no public version tag or GitHub Release has been published)
 - **Active milestone:** [0.2.0 — Snippet management](https://github.com/toku345/Yank/milestone/1)
-- **Current focus:** [#32 Add snippet data models](https://github.com/toku345/Yank/issues/32)
+- **Current focus:** [#33 Add viewer tabs for history and snippets](https://github.com/toku345/Yank/issues/33)
 - **Public distribution:** Deferred; see [Issue #53](https://github.com/toku345/Yank/issues/53)
 
 ## Features
@@ -24,7 +24,7 @@ A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Cli
 
 ### Planned
 
-- **Snippet management** — folder-organized snippets with C-f/C-b tab switching (Phase 2)
+- **Snippet management** — folder-organized snippets with Cmd+Shift+[ / Cmd+Shift+] tab switching (Phase 2)
 - **Clipy snippet import** — import existing Clipy XML snippets (Phase 2)
 - **Expanded menu bar controls and settings** — viewer access and usable preferences from the menu bar (Phase 3)
 - **Sensitive value handling** — sensitive classification and auto-delete after paste (Phase 3)
@@ -103,6 +103,7 @@ artifacts.
 | C-p / Up | Move selection up |
 | C-a | Jump to top |
 | C-e | Jump to bottom |
+| Cmd+Shift+[ / Cmd+Shift+] | Switch to the previous / next tab |
 | Return | Paste selected item |
 | Delete | Delete selected history item |
 | C-g / Escape | Close viewer |

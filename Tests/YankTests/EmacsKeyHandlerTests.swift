@@ -46,6 +46,34 @@ final class EmacsKeyHandlerTests: XCTestCase {
         )
     }
 
+    func testCommandShiftRightBracket_switchesTabForward() {
+        let event = makeKeyEvent(
+            keyCode: 30,
+            modifierFlags: [.command, .shift]
+        )
+        XCTAssertEqual(
+            EmacsKeyHandler.handle(
+                event: event,
+                trackedModifiers: [.command, .shift]
+            ),
+            .switchTab(.forward)
+        )
+    }
+
+    func testCommandShiftLeftBracket_switchesTabBackward() {
+        let event = makeKeyEvent(
+            keyCode: 33,
+            modifierFlags: [.command, .shift]
+        )
+        XCTAssertEqual(
+            EmacsKeyHandler.handle(
+                event: event,
+                trackedModifiers: [.command, .shift]
+            ),
+            .switchTab(.backward)
+        )
+    }
+
     func testControlG_closes() {
         let event = makeControlKeyEvent(character: "g")
         XCTAssertEqual(
@@ -86,6 +114,28 @@ final class EmacsKeyHandlerTests: XCTestCase {
     func testBareG_withStaleEventControlFlag_doesNotClose() {
         let event = makeControlKeyEvent(character: "g")
         XCTAssertNil(EmacsKeyHandler.handle(event: event, trackedModifiers: []))
+    }
+
+    func testCommandShiftBracket_withStaleEventFlags_doesNotSwitchTab() {
+        let event = makeKeyEvent(
+            keyCode: 30,
+            modifierFlags: [.command, .shift]
+        )
+        XCTAssertNil(EmacsKeyHandler.handle(event: event, trackedModifiers: []))
+    }
+
+    func testControlF_doesNotSwitchTab() {
+        let event = makeControlKeyEvent(character: "f")
+        XCTAssertNil(
+            EmacsKeyHandler.handle(event: event, trackedModifiers: .control)
+        )
+    }
+
+    func testControlB_doesNotSwitchTab() {
+        let event = makeControlKeyEvent(character: "b")
+        XCTAssertNil(
+            EmacsKeyHandler.handle(event: event, trackedModifiers: .control)
+        )
     }
 
     // MARK: - Plain key bindings

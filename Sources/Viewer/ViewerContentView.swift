@@ -14,7 +14,7 @@ struct ViewerContentView: View {
     @Query(sort: \ClipItem.createdAt, order: .reverse)
     private var clipItems: [ClipItem]
 
-    let viewerState: ViewerState
+    @Bindable var viewerState: ViewerState
     @State private var isClearingHistory = false
 
     let onPaste: (ClipItem, PasteFormat) -> Void
@@ -22,6 +22,30 @@ struct ViewerContentView: View {
     let onClearHistory: @MainActor () async throws -> Void
 
     var body: some View {
+        TabView(selection: $viewerState.selectedTab) {
+            Tab("History", systemImage: "clock", value: ViewerTab.history) {
+                historyContent
+            }
+            Tab("Snippets", systemImage: "text.quote", value: ViewerTab.snippets) {
+                ContentUnavailableView(
+                    "Snippets",
+                    systemImage: "text.quote",
+                    description: Text("Snippet browsing is coming in a future update.")
+                )
+            }
+        }
+        .frame(minWidth: 350, idealWidth: 400, minHeight: 300, idealHeight: 500)
+        .onChange(of: viewerState.pendingAction) { _, action in
+            guard let action else { return }
+            defer { viewerState.pendingAction = nil }
+            handleViewAction(action)
+        }
+        .onChange(of: clipItems.map(\.persistentModelID)) { _, newIDs in
+            viewerState.replaceItems(with: newIDs)
+        }
+    }
+
+    private var historyContent: some View {
         VStack(spacing: 0) {
             if clipItems.isEmpty {
                 ContentUnavailableView(
@@ -44,18 +68,6 @@ struct ViewerContentView: View {
                 hasItems: !clipItems.isEmpty,
                 isClearingHistory: isClearingHistory
             )
-        }
-        .frame(minWidth: 350, idealWidth: 400, minHeight: 300, idealHeight: 500)
-        .onChange(of: viewerState.pendingAction) { _, action in
-            guard let action else { return }
-            defer { viewerState.pendingAction = nil }
-            handleViewAction(action)
-        }
-        .onChange(of: clipItems.map(\.persistentModelID)) { _, newIDs in
-            viewerState.replaceItems(with: newIDs)
-        }
-        .onAppear {
-            viewerState.replaceItems(with: clipItems.map(\.persistentModelID))
         }
     }
 
@@ -84,6 +96,12 @@ struct ViewerContentView: View {
     }
 
     private func handleViewAction(_ action: ViewerAction) {
+        if action == .close {
+            onClose()
+            return
+        }
+        guard viewerState.selectedTab == .history else { return }
+
         switch action {
         case .paste(let format):
             if let id = viewerState.selectedID,
@@ -94,9 +112,7 @@ struct ViewerContentView: View {
             deleteSelectedItem()
         case .clearHistory:
             beginClearingHistory()
-        case .close:
-            onClose()
-        case .move, .jumpToStart, .jumpToEnd:
+        case .move, .jumpToStart, .jumpToEnd, .switchTab, .close:
             break
         }
     }
