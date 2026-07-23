@@ -40,6 +40,58 @@ final class ViewerPanelTests: XCTestCase {
         XCTAssertEqual(state.selectedID, itemID)
     }
 
+    func testSendEvent_commandShiftRightBracketSwitchesTabForward() throws {
+        let state = ViewerState()
+        let panel = makePanel(viewerState: state)
+
+        panel.sendEvent(
+            try makeFlagsChangedEvent(modifierFlags: [.command, .shift])
+        )
+        panel.sendEvent(
+            try makeCharacterEvent(
+                character: "}",
+                keyCode: 30,
+                modifierFlags: [.command, .shift]
+            )
+        )
+
+        XCTAssertEqual(state.selectedTab, .snippets)
+    }
+
+    func testSendEvent_commandShiftLeftBracketSwitchesTabBackward() throws {
+        let state = ViewerState()
+        state.selectedTab = .snippets
+        let panel = makePanel(viewerState: state)
+
+        panel.sendEvent(
+            try makeFlagsChangedEvent(modifierFlags: [.command, .shift])
+        )
+        panel.sendEvent(
+            try makeCharacterEvent(
+                character: "{",
+                keyCode: 33,
+                modifierFlags: [.command, .shift]
+            )
+        )
+
+        XCTAssertEqual(state.selectedTab, .history)
+    }
+
+    func testSendEvent_staleEventCommandShiftFlagsDoNotSwitchTab() throws {
+        let state = ViewerState()
+        let panel = makePanel(viewerState: state)
+
+        panel.sendEvent(
+            try makeCharacterEvent(
+                character: "}",
+                keyCode: 30,
+                modifierFlags: [.command, .shift]
+            )
+        )
+
+        XCTAssertEqual(state.selectedTab, .history)
+    }
+
     private func makePanel(viewerState: ViewerState) -> ViewerPanel {
         ViewerPanel(
             viewerState: viewerState,
@@ -88,6 +140,46 @@ final class ViewerPanelTests: XCTestCase {
                 charactersIgnoringModifiers: "",
                 isARepeat: isARepeat,
                 keyCode: 125
+            )
+        )
+    }
+
+    private func makeFlagsChangedEvent(
+        modifierFlags: NSEvent.ModifierFlags
+    ) throws -> NSEvent {
+        try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .flagsChanged,
+                location: .zero,
+                modifierFlags: modifierFlags,
+                timestamp: Self.currentUptime,
+                windowNumber: 0,
+                context: nil,
+                characters: "",
+                charactersIgnoringModifiers: "",
+                isARepeat: false,
+                keyCode: 59
+            )
+        )
+    }
+
+    private func makeCharacterEvent(
+        character: String,
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags
+    ) throws -> NSEvent {
+        try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: modifierFlags,
+                timestamp: Self.currentUptime,
+                windowNumber: 0,
+                context: nil,
+                characters: character,
+                charactersIgnoringModifiers: character,
+                isARepeat: false,
+                keyCode: keyCode
             )
         )
     }

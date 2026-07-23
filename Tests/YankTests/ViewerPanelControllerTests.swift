@@ -57,6 +57,34 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertEqual(state.selectedID, newestID)
     }
 
+    func testShow_preservesSnippetsTabAndResetsHistorySelection() throws {
+        let fixture = try makeItemFixture(count: 2)
+        let newestID = fixture.items[0].persistentModelID
+        let olderID = fixture.items[1].persistentModelID
+        let loadedIDs = [newestID, olderID]
+        let state = ViewerState()
+        state.selectedTab = .snippets
+        state.itemIDs = loadedIDs
+        state.selectedID = olderID
+        var presentationCount = 0
+
+        let controller = ViewerPanelController(
+            modelContainer: fixture.container,
+            viewerState: state,
+            onClearHistory: {},
+            loadHistoryIDs: { loadedIDs },
+            reportLoadFailure: { error in
+                XCTFail("Unexpected load failure: \(error)")
+            },
+            presentPanel: { _ in presentationCount += 1 }
+        )
+
+        XCTAssertTrue(controller.show())
+        XCTAssertEqual(presentationCount, 1)
+        XCTAssertEqual(state.selectedTab, .snippets)
+        XCTAssertEqual(state.selectedID, newestID)
+    }
+
     func testShow_emptySnapshotClearsStateAndPresentsEmptyViewer() throws {
         let fixture = try makeItemFixture(count: 1)
         let state = ViewerState()
@@ -110,6 +138,32 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertFalse(controller.show())
         XCTAssertEqual(reportCount, 1)
         XCTAssertEqual(presentationCount, 0)
+        XCTAssertTrue(state.itemIDs.isEmpty)
+        XCTAssertNil(state.selectedID)
+    }
+
+    func testShow_failurePreservesSnippetsTabAndDoesNotPresent() throws {
+        let fixture = try makeItemFixture(count: 1)
+        let state = ViewerState()
+        state.selectedTab = .snippets
+        state.itemIDs = fixture.items.map(\.persistentModelID)
+        state.selectedID = state.itemIDs.first
+        var reportCount = 0
+        var presentationCount = 0
+
+        let controller = ViewerPanelController(
+            modelContainer: fixture.container,
+            viewerState: state,
+            onClearHistory: {},
+            loadHistoryIDs: { throw TestFailure.loadFailed },
+            reportLoadFailure: { _ in reportCount += 1 },
+            presentPanel: { _ in presentationCount += 1 }
+        )
+
+        XCTAssertFalse(controller.show())
+        XCTAssertEqual(reportCount, 1)
+        XCTAssertEqual(presentationCount, 0)
+        XCTAssertEqual(state.selectedTab, .snippets)
         XCTAssertTrue(state.itemIDs.isEmpty)
         XCTAssertNil(state.selectedID)
     }

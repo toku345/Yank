@@ -1,6 +1,10 @@
 import AppKit
 
 enum EmacsKeyHandler {
+    private static let shortcutModifierMask: NSEvent.ModifierFlags = [
+        .command, .control, .option, .shift
+    ]
+
     /// - Parameters:
     ///   - event: The raw key-down event from `sendEvent`.
     ///   - trackedModifiers: Modifier flags tracked via `flagsChanged` events
@@ -11,6 +15,10 @@ enum EmacsKeyHandler {
         event: NSEvent,
         trackedModifiers: NSEvent.ModifierFlags = []
     ) -> ViewerAction? {
+        let shortcutModifiers = trackedModifiers.intersection(shortcutModifierMask)
+        if shortcutModifiers == [.command, .shift] {
+            return handleCommandShift(event: event)
+        }
         // Ctrl+Return → plain text, bare Return → original format.
         if event.keyCode == 36 {
             return trackedModifiers.contains(.control)
@@ -21,6 +29,18 @@ enum EmacsKeyHandler {
             return handleControl(event: event)
         }
         return handlePlain(event: event)
+    }
+
+    private static func handleCommandShift(event: NSEvent) -> ViewerAction? {
+        // Match by produced character, not keyCode: kVK_ANSI_* codes are
+        // physical ANSI positions, so keyCode matching breaks on JIS and
+        // other layouts. charactersIgnoringModifiers applies Shift, so the
+        // bracket keys report "{" / "}"; accept the unshifted forms too.
+        switch event.charactersIgnoringModifiers {
+        case "[", "{": .switchTab(.backward)
+        case "]", "}": .switchTab(.forward)
+        default: nil
+        }
     }
 
     private static func handleControl(event: NSEvent) -> ViewerAction? {

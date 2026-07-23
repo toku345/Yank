@@ -88,6 +88,9 @@ final class EmacsKeyHandlerTests: XCTestCase {
         XCTAssertNil(EmacsKeyHandler.handle(event: event, trackedModifiers: []))
     }
 
+    // Cmd+Shift bracket tab switching and chord swallowing are covered in
+    // EmacsKeyHandlerTabShortcutTests.
+
     // MARK: - Plain key bindings
 
     func testReturn_pastesOriginal() {
@@ -224,6 +227,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
 
     private func makeKeyEvent(
         keyCode: UInt16,
+        character: String = "",
         modifierFlags: NSEvent.ModifierFlags = [],
         isARepeat: Bool = false
     ) -> NSEvent {
@@ -234,8 +238,8 @@ final class EmacsKeyHandlerTests: XCTestCase {
             timestamp: 0,
             windowNumber: 0,
             context: nil,
-            characters: "",
-            charactersIgnoringModifiers: "",
+            characters: character,
+            charactersIgnoringModifiers: character,
             isARepeat: isARepeat,
             keyCode: keyCode
         )!

@@ -52,7 +52,8 @@ Phase 2 is complete when:
 
 - snippet folders and snippets are persisted with stable user-defined ordering;
 - users can create, edit, delete, and reorder folders and snippets;
-- the viewer provides History and Snippets tabs, switchable with C-f and C-b;
+- the viewer provides History and Snippets tabs, switchable with Cmd+Shift+[
+  and Cmd+Shift+];
 - folders and snippets are displayed in saved order and support C-n, C-p, C-a,
   and C-e navigation;
 - Return pastes the selected snippet as plain text through the existing paste
