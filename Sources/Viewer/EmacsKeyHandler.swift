@@ -32,9 +32,13 @@ enum EmacsKeyHandler {
     }
 
     private static func handleCommandShift(event: NSEvent) -> ViewerAction? {
-        switch event.keyCode {
-        case 33: .switchTab(.backward) // Left bracket
-        case 30: .switchTab(.forward)  // Right bracket
+        // Match by produced character, not keyCode: kVK_ANSI_* codes are
+        // physical ANSI positions, so keyCode matching breaks on JIS and
+        // other layouts. charactersIgnoringModifiers applies Shift, so the
+        // bracket keys report "{" / "}"; accept the unshifted forms too.
+        switch event.charactersIgnoringModifiers {
+        case "[", "{": .switchTab(.backward)
+        case "]", "}": .switchTab(.forward)
         default: nil
         }
     }

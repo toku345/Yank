@@ -46,34 +46,6 @@ final class EmacsKeyHandlerTests: XCTestCase {
         )
     }
 
-    func testCommandShiftRightBracket_switchesTabForward() {
-        let event = makeKeyEvent(
-            keyCode: 30,
-            modifierFlags: [.command, .shift]
-        )
-        XCTAssertEqual(
-            EmacsKeyHandler.handle(
-                event: event,
-                trackedModifiers: [.command, .shift]
-            ),
-            .switchTab(.forward)
-        )
-    }
-
-    func testCommandShiftLeftBracket_switchesTabBackward() {
-        let event = makeKeyEvent(
-            keyCode: 33,
-            modifierFlags: [.command, .shift]
-        )
-        XCTAssertEqual(
-            EmacsKeyHandler.handle(
-                event: event,
-                trackedModifiers: [.command, .shift]
-            ),
-            .switchTab(.backward)
-        )
-    }
-
     func testControlG_closes() {
         let event = makeControlKeyEvent(character: "g")
         XCTAssertEqual(
@@ -116,27 +88,8 @@ final class EmacsKeyHandlerTests: XCTestCase {
         XCTAssertNil(EmacsKeyHandler.handle(event: event, trackedModifiers: []))
     }
 
-    func testCommandShiftBracket_withStaleEventFlags_doesNotSwitchTab() {
-        let event = makeKeyEvent(
-            keyCode: 30,
-            modifierFlags: [.command, .shift]
-        )
-        XCTAssertNil(EmacsKeyHandler.handle(event: event, trackedModifiers: []))
-    }
-
-    func testControlF_doesNotSwitchTab() {
-        let event = makeControlKeyEvent(character: "f")
-        XCTAssertNil(
-            EmacsKeyHandler.handle(event: event, trackedModifiers: .control)
-        )
-    }
-
-    func testControlB_doesNotSwitchTab() {
-        let event = makeControlKeyEvent(character: "b")
-        XCTAssertNil(
-            EmacsKeyHandler.handle(event: event, trackedModifiers: .control)
-        )
-    }
+    // Cmd+Shift bracket tab switching and chord swallowing are covered in
+    // EmacsKeyHandlerTabShortcutTests.
 
     // MARK: - Plain key bindings
 
@@ -274,6 +227,7 @@ final class EmacsKeyHandlerTests: XCTestCase {
 
     private func makeKeyEvent(
         keyCode: UInt16,
+        character: String = "",
         modifierFlags: NSEvent.ModifierFlags = [],
         isARepeat: Bool = false
     ) -> NSEvent {
@@ -284,8 +238,8 @@ final class EmacsKeyHandlerTests: XCTestCase {
             timestamp: 0,
             windowNumber: 0,
             context: nil,
-            characters: "",
-            charactersIgnoringModifiers: "",
+            characters: character,
+            charactersIgnoringModifiers: character,
             isARepeat: isARepeat,
             keyCode: keyCode
         )!

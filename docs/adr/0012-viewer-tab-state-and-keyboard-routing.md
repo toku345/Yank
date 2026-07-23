@@ -34,6 +34,13 @@ to supply modifier state tracked through `flagsChanged`, and
 `ViewerState.perform()` applies the tab transition directly. Tab movement stops
 at the first or last tab rather than wrapping.
 
+Match the bracket shortcuts by the character the key event produces
+(`charactersIgnoringModifiers`), not by physical key code. `kVK_ANSI_*` codes
+name ANSI physical positions, so key-code matching would break or invert the
+shortcut on non-ANSI layouts such as JIS. While the Command-Shift chord is
+held, the handler maps no other keys: Return, Escape, and Delete deliberately
+do not paste, close, or delete until the modifiers are released.
+
 While Snippets is selected, `ViewerState` ignores History-only movement, jump,
 paste, delete, and clear actions. Close and tab-switch actions remain available.
 The History tab owns its list, empty state, and deletion controls; the Snippets
