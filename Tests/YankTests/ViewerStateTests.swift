@@ -35,6 +35,83 @@ final class ViewerStateTests: XCTestCase {
         try makeItems(count: count).map(\.persistentModelID)
     }
 
+    // MARK: - Tab switching
+
+    func testInitialTab_isHistory() {
+        XCTAssertEqual(state.selectedTab, .history)
+    }
+
+    func testSwitchTabForward_fromHistory_selectsSnippets() {
+        state.perform(.switchTab(.forward))
+
+        XCTAssertEqual(state.selectedTab, .snippets)
+    }
+
+    func testSwitchTabForward_fromSnippets_staysAtSnippets() {
+        state.selectedTab = .snippets
+
+        state.perform(.switchTab(.forward))
+
+        XCTAssertEqual(state.selectedTab, .snippets)
+    }
+
+    func testSwitchTabBackward_fromSnippets_selectsHistory() {
+        state.selectedTab = .snippets
+
+        state.perform(.switchTab(.backward))
+
+        XCTAssertEqual(state.selectedTab, .history)
+    }
+
+    func testSwitchTabBackward_fromHistory_staysAtHistory() {
+        state.perform(.switchTab(.backward))
+
+        XCTAssertEqual(state.selectedTab, .history)
+    }
+
+    func testSwitchTabRoundTrip_preservesHistorySelection() throws {
+        let ids = try makeItemIDs(count: 2)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+
+        state.perform(.switchTab(.forward))
+        state.perform(.switchTab(.backward))
+
+        XCTAssertEqual(state.itemIDs, ids)
+        XCTAssertEqual(state.selectedID, ids[1])
+    }
+
+    func testHistoryMovementActions_areIgnoredInSnippets() throws {
+        let ids = try makeItemIDs(count: 3)
+        state.itemIDs = ids
+        state.selectedID = ids[1]
+        state.selectedTab = .snippets
+
+        state.perform(.move(.down))
+        state.perform(.jumpToStart)
+        state.perform(.jumpToEnd)
+
+        XCTAssertEqual(state.selectedID, ids[1])
+    }
+
+    func testHistoryViewActions_areIgnoredInSnippets() {
+        state.selectedTab = .snippets
+
+        state.perform(.paste(.original))
+        state.perform(.deleteSelected)
+        state.perform(.clearHistory)
+
+        XCTAssertNil(state.pendingAction)
+    }
+
+    func testClose_isAvailableInSnippets() {
+        state.selectedTab = .snippets
+
+        state.perform(.close)
+
+        XCTAssertEqual(state.pendingAction, .close)
+    }
+
     // MARK: - move(.down)
 
     func testMoveDown_fromFirst_selectsSecond() throws {

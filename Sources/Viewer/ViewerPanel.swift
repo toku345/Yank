@@ -8,7 +8,7 @@ final class ViewerPanel: NSPanel {
     private let currentUptime: () -> TimeInterval
     /// Tracks modifier keys via flagsChanged events for reliable detection.
     /// NSEvent.modifierFlags on keyDown carries stale state from prior
-    /// key combos (Cmd+Shift+V hotkey, Ctrl+N/P navigation).
+    /// key combos (Cmd+Shift+V hotkey, viewer keyboard shortcuts).
     private var trackedModifiers: NSEvent.ModifierFlags = []
 
     init(
@@ -41,26 +41,38 @@ final class ViewerPanel: NSPanel {
 
     // Intercept key events at the window level before the responder chain.
     // SwiftUI controls inside the panel can hold first-responder and swallow
-    // keyDown, so Emacs bindings must be caught here rather than left to the
-    // responder chain.
+    // keyDown, so viewer shortcuts must be caught here rather than left to
+    // the responder chain.
     override func sendEvent(_ event: NSEvent) {
         if event.type == .flagsChanged {
             trackedModifiers = event.modifierFlags
                 .intersection(.deviceIndependentFlagsMask)
         }
-        if event.type == .keyDown,
-           let action = EmacsKeyHandler.handle(
-               event: event, trackedModifiers: trackedModifiers
-           ) {
+        if event.type == .keyDown, handleViewerKeyDown(event) {
+            return
+        }
+        super.sendEvent(event)
+    }
+
+    @discardableResult
+    func handleViewerKeyDown(_ event: NSEvent) -> Bool {
+        switch EmacsKeyHandler.handle(
+            event: event,
+            trackedModifiers: trackedModifiers
+        ) {
+        case .action(let action):
             guard ViewerActionDispatchPolicy.shouldDispatch(
                 action: action,
                 isRepeat: event.isARepeat,
                 age: currentUptime() - event.timestamp
-            ) else { return }
+            ) else { return true }
             viewerState.perform(action)
-            return
+            return true
+        case .consumed:
+            return true
+        case .unhandled:
+            return false
         }
-        super.sendEvent(event)
     }
 
     func resetTrackedModifiers() {

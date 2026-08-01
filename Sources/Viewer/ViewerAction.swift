@@ -6,14 +6,24 @@ enum PasteFormat {
     case plainText
 }
 
+enum ViewerTab: Hashable {
+    case history
+    case snippets
+}
+
 enum ViewerAction: Equatable {
     enum Direction {
         case up, down
     }
 
+    enum TabDirection: Equatable {
+        case forward, backward
+    }
+
     case move(Direction)
     case jumpToStart
     case jumpToEnd
+    case switchTab(TabDirection)
     case paste(PasteFormat)
     case deleteSelected
     case clearHistory
@@ -44,10 +54,21 @@ final class ViewerState {
     /// Movement actions are handled synchronously via perform().
     var pendingAction: ViewerAction?
 
+    var selectedTab: ViewerTab = .history
     var selectedID: PersistentIdentifier?
     var itemIDs: [PersistentIdentifier] = []
 
     func perform(_ action: ViewerAction) {
+        if case .switchTab(let direction) = action {
+            switchTab(direction)
+            return
+        }
+        if action == .close {
+            pendingAction = action
+            return
+        }
+        guard selectedTab == .history else { return }
+
         switch action {
         case .move(let direction):
             moveSelection(direction)
@@ -55,8 +76,10 @@ final class ViewerState {
             selectedID = itemIDs.first
         case .jumpToEnd:
             selectedID = itemIDs.last
-        case .paste, .deleteSelected, .clearHistory, .close:
+        case .paste, .deleteSelected, .clearHistory:
             pendingAction = action
+        case .switchTab, .close:
+            break
         }
     }
 
@@ -90,6 +113,17 @@ final class ViewerState {
     func clearItems() {
         itemIDs = []
         selectedID = nil
+    }
+
+    private func switchTab(_ direction: ViewerAction.TabDirection) {
+        switch (selectedTab, direction) {
+        case (.history, .forward):
+            selectedTab = .snippets
+        case (.snippets, .backward):
+            selectedTab = .history
+        case (.history, .backward), (.snippets, .forward):
+            break
+        }
     }
 
     private func moveSelection(_ direction: ViewerAction.Direction) {
