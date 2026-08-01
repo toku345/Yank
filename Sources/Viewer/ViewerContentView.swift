@@ -96,12 +96,15 @@ struct ViewerContentView: View {
     }
 
     private func handleViewAction(_ action: ViewerAction) {
-        if action == .close {
-            onClose()
-            return
-        }
-        guard viewerState.selectedTab == .history else { return }
+        ViewerContentActionRouting.handle(
+            action: action,
+            selectedTab: viewerState.selectedTab,
+            onClose: onClose,
+            onHistoryAction: handleHistoryAction
+        )
+    }
 
+    private func handleHistoryAction(_ action: ViewerAction) {
         switch action {
         case .paste(let format):
             if let id = viewerState.selectedID,
@@ -180,6 +183,28 @@ struct ViewerContentView: View {
             """
         alert.alertStyle = .warning
         alert.runModal()
+    }
+}
+
+enum ViewerContentActionRouting {
+    static func handle(
+        action: ViewerAction,
+        selectedTab: ViewerTab,
+        onClose: () -> Void,
+        onHistoryAction: (ViewerAction) -> Void
+    ) {
+        if action == .close {
+            onClose()
+            return
+        }
+        guard selectedTab == .history else { return }
+
+        switch action {
+        case .paste, .deleteSelected, .clearHistory:
+            onHistoryAction(action)
+        case .move, .jumpToStart, .jumpToEnd, .switchTab, .close:
+            break
+        }
     }
 }
 
