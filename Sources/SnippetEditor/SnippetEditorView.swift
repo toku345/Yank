@@ -35,6 +35,7 @@ struct SnippetEditorView: View {
     let dirtyDraftPrompt: SnippetEditorWindowController.DirtyDraftPrompt
     let deleteConfirmation: SnippetEditorWindowController.DeleteConfirmation
     let errorReporter: SnippetEditorWindowController.ErrorReporter
+    let dragRegistry: SnippetEditorDragRegistry
 
     var body: some View {
         NavigationSplitView {

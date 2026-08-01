@@ -140,37 +140,42 @@ extension SnippetEditorView {
     }
 
     func handleFolderRowDrop(_ payloads: [SnippetEditorDragPayload], target: SnippetFolder) -> Bool {
-        guard let payload = payloads.first else { return false }
-        switch payload.kind {
+        guard let payload = payloads.first,
+              let item = dragRegistry.resolve(payload) else { return false }
+        switch item.kind {
         case .folder:
             return performMutation("reorder the folders") {
-                try SnippetMutations.moveFolder(id: payload.id, before: target.persistentModelID, in: modelContext)
+                try SnippetMutations.moveFolder(id: item.id, before: target.persistentModelID, in: modelContext)
             }
         case .snippet:
-            guard let snippet = snippet(id: payload.id) else { return false }
+            guard let snippet = snippet(id: item.id) else { return false }
             return requestMove(snippet: snippet, to: target, before: nil)
         }
     }
 
     func handleFolderListEndDrop(_ payloads: [SnippetEditorDragPayload]) -> Bool {
-        guard let payload = payloads.first, payload.kind == .folder else { return false }
+        guard let payload = payloads.first,
+              let item = dragRegistry.resolve(payload),
+              item.kind == .folder else { return false }
         return performMutation("reorder the folders") {
-            try SnippetMutations.moveFolder(id: payload.id, before: nil, in: modelContext)
+            try SnippetMutations.moveFolder(id: item.id, before: nil, in: modelContext)
         }
     }
 
     func handleSnippetRowDrop(_ payloads: [SnippetEditorDragPayload], target: Snippet) -> Bool {
         guard let payload = payloads.first,
-              payload.kind == .snippet,
-              let snippet = snippet(id: payload.id),
+              let item = dragRegistry.resolve(payload),
+              item.kind == .snippet,
+              let snippet = snippet(id: item.id),
               let folder = target.folder else { return false }
         return requestMove(snippet: snippet, to: folder, before: target.persistentModelID)
     }
 
     func handleSnippetListEndDrop(_ payloads: [SnippetEditorDragPayload], folder: SnippetFolder) -> Bool {
         guard let payload = payloads.first,
-              payload.kind == .snippet,
-              let snippet = snippet(id: payload.id) else { return false }
+              let item = dragRegistry.resolve(payload),
+              item.kind == .snippet,
+              let snippet = snippet(id: item.id) else { return false }
         return requestMove(snippet: snippet, to: folder, before: nil)
     }
 

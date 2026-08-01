@@ -18,6 +18,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
 
     private let modelContainer: ModelContainer
     private let state: SnippetEditorState
+    private let dragRegistry = SnippetEditorDragRegistry()
     private let dirtyDraftPrompt: DirtyDraftPrompt
     private let deleteConfirmation: DeleteConfirmation
     private let errorReporter: ErrorReporter
@@ -82,7 +83,8 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
             state: state,
             dirtyDraftPrompt: dirtyDraftPrompt,
             deleteConfirmation: deleteConfirmation,
-            errorReporter: errorReporter
+            errorReporter: errorReporter,
+            dragRegistry: dragRegistry
         )
         .modelContainer(modelContainer)
         let hostingView = NSHostingView(rootView: rootView)

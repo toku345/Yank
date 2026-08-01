@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 extension SnippetEditorView {
@@ -38,7 +39,7 @@ extension SnippetEditorView {
     func folderRow(_ folder: SnippetFolder) -> some View {
         Text(folder.title)
             .tag(folder.persistentModelID)
-            .draggable(SnippetEditorDragPayload(kind: .folder, id: folder.persistentModelID))
+            .draggable(dragPayload(kind: .folder, id: folder.persistentModelID))
             .dropDestination(for: SnippetEditorDragPayload.self) { payloads, _ in
                 handleFolderRowDrop(payloads, target: folder)
             }
@@ -114,7 +115,7 @@ extension SnippetEditorView {
     func snippetRow(_ snippet: Snippet) -> some View {
         Text(snippet.title)
             .tag(snippet.persistentModelID)
-            .draggable(SnippetEditorDragPayload(kind: .snippet, id: snippet.persistentModelID))
+            .draggable(dragPayload(kind: .snippet, id: snippet.persistentModelID))
             .dropDestination(for: SnippetEditorDragPayload.self) { payloads, _ in
                 handleSnippetRowDrop(payloads, target: snippet)
             }
@@ -143,5 +144,12 @@ extension SnippetEditorView {
                 }
             }
         }
+    }
+
+    func dragPayload(
+        kind: SnippetEditorDragItem.Kind,
+        id: PersistentIdentifier
+    ) -> SnippetEditorDragPayload {
+        dragRegistry.payload(for: SnippetEditorDragItem(kind: kind, id: id))
     }
 }

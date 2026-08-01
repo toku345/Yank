@@ -18,7 +18,7 @@ Editor selection and unsaved fields live in a dedicated observable state object 
 
 Mutation helpers are stateless and receive the shared main `ModelContext` for each operation. They require a clean context before starting, normalize folder and per-folder snippet order to dense zero-based integers, save once, and roll back on failure. Clipboard persistence continues to use its existing separate context.
 
-Drag-and-drop uses an app-specific transferable payload containing an item kind and SwiftData `PersistentIdentifier`. Drop handlers resolve and validate the identifier in the current context before applying any change. A Move to Folder menu remains available so drag-and-drop is not the only movement path.
+Drag-and-drop uses an app-specific transferable payload containing an opaque UUID token. A registry owned by the reusable editor window maps each token to an item kind and SwiftData `PersistentIdentifier` for that window's lifetime. Drop handlers reject unknown tokens, then resolve and validate the identifier in the current context before applying any change. A Move to Folder menu remains available so drag-and-drop is not the only movement path.
 
 ## Consequences
 
