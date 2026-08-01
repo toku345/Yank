@@ -11,6 +11,7 @@ final class AppCoordinator {
     private(set) var clipboardMonitor: ClipboardMonitor?
     private(set) var hotKeyManager: HotKeyManager?
     private(set) var panelController: ViewerPanelController?
+    private(set) var snippetEditorWindowController: SnippetEditorWindowController?
 
     func start() {
         checkAccessibility()
@@ -50,6 +51,10 @@ final class AppCoordinator {
         controller.onClose = { [weak self] in self?.panelController?.close() }
         panelController = controller
 
+        snippetEditorWindowController = SnippetEditorWindowController(
+            modelContainer: container
+        )
+
         let hotKey = HotKeyManager()
         hotKey.onToggle = { [weak self] in
             self?.panelController?.toggle()
@@ -63,6 +68,18 @@ final class AppCoordinator {
         hotKeyManager = hotKey
 
         logger.info("Yank initialized successfully")
+    }
+
+    func showSnippetEditor() {
+        guard let snippetEditorWindowController else {
+            logger.error("Snippet editor requested before app initialization completed")
+            return
+        }
+        snippetEditorWindowController.show()
+    }
+
+    func prepareForTermination() -> Bool {
+        snippetEditorWindowController?.prepareForTermination() ?? true
     }
 
     func beginShutdown() {

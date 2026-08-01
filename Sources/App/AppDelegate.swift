@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     let coordinator: AppCoordinator
+    private let prepareForTermination: @MainActor () -> Bool
     private let beginShutdown: @MainActor () -> Void
     private let finishShutdown: @MainActor () async -> Void
     private let replyToTermination: @MainActor (NSApplication, Bool) -> Void
@@ -20,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let coordinator = AppCoordinator()
         self.init(
             coordinator: coordinator,
+            prepareForTermination: { coordinator.prepareForTermination() },
             beginShutdown: { coordinator.beginShutdown() },
             finishShutdown: { await coordinator.finishShutdown() },
             replyToTermination: { application, shouldTerminate in
@@ -30,11 +32,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     init(
         coordinator: AppCoordinator,
+        prepareForTermination: @escaping @MainActor () -> Bool = { true },
         beginShutdown: @escaping @MainActor () -> Void,
         finishShutdown: @escaping @MainActor () async -> Void,
         replyToTermination: @escaping @MainActor (NSApplication, Bool) -> Void
     ) {
         self.coordinator = coordinator
+        self.prepareForTermination = prepareForTermination
         self.beginShutdown = beginShutdown
         self.finishShutdown = finishShutdown
         self.replyToTermination = replyToTermination
@@ -54,6 +58,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         switch terminationPhase {
         case .running:
+            guard prepareForTermination() else {
+                return .terminateCancel
+            }
             terminationPhase = .draining
             beginShutdown()
             let finishShutdown = finishShutdown

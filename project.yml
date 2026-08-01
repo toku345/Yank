@@ -39,6 +39,11 @@ targets:
           Yank needs Accessibility access to simulate paste (Cmd+V)
           after selecting a clipboard history item.
         NSHumanReadableCopyright: "Copyright © 2026 toku345. All rights reserved."
+        UTExportedTypeDeclarations:
+          - UTTypeConformsTo:
+              - public.data
+            UTTypeDescription: Yank Snippet Editor Item
+            UTTypeIdentifier: com.toku345.Yank.snippet-editor-item
     entitlements:
       path: SupportingFiles/Yank.entitlements
       properties:
