@@ -6,7 +6,7 @@ A clipboard manager for macOS, successor to [Clipy](https://github.com/Clipy/Cli
 
 - **Current app version in source:** `0.1.0` (no public version tag or GitHub Release has been published)
 - **Active milestone:** [0.2.0 — Snippet management](https://github.com/toku345/Yank/milestone/1)
-- **Current focus:** [#33 Add viewer tabs for history and snippets](https://github.com/toku345/Yank/issues/33)
+- **Current focus:** [#34 Add snippet editor window](https://github.com/toku345/Yank/issues/34)
 - **Public distribution:** Deferred; see [Issue #53](https://github.com/toku345/Yank/issues/53)
 
 ## Features
