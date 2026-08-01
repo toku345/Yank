@@ -1,6 +1,14 @@
 import AppKit
 
+enum ViewerKeyHandlingResult: Equatable {
+    case action(ViewerAction)
+    case consumed
+    case unhandled
+}
+
 enum EmacsKeyHandler {
+    typealias CharacterTranslator = (NSEvent.ModifierFlags) -> String?
+
     private static let shortcutModifierMask: NSEvent.ModifierFlags = [
         .command, .control, .option, .shift
     ]
@@ -8,39 +16,96 @@ enum EmacsKeyHandler {
     /// - Parameters:
     ///   - event: The raw key-down event from `sendEvent`.
     ///   - trackedModifiers: Modifier flags tracked via `flagsChanged` events
-    ///     in ViewerPanel. Used for all control-shortcut dispatch because
+    ///     in ViewerPanel. Used for modifier-sensitive dispatch because
     ///     `event.modifierFlags` carries stale state from prior key combos
     ///     (see ViewerPanel.trackedModifiers).
     static func handle(
         event: NSEvent,
-        trackedModifiers: NSEvent.ModifierFlags = []
-    ) -> ViewerAction? {
+        trackedModifiers: NSEvent.ModifierFlags = [],
+        translateCharacter: CharacterTranslator? = nil
+    ) -> ViewerKeyHandlingResult {
         let shortcutModifiers = trackedModifiers.intersection(shortcutModifierMask)
         if shortcutModifiers == [.command, .shift] {
-            return handleCommandShift(event: event)
+            let character = translatedCharacter(
+                event: event,
+                modifiers: .shift,
+                translateCharacter: translateCharacter
+            )
+            return tabAction(for: character).map(ViewerKeyHandlingResult.action)
+                ?? .consumed
+        }
+        if shortcutModifiers == [.command, .option, .shift] {
+            return handleLayoutRequiredOptionShortcut(
+                event: event,
+                translateCharacter: translateCharacter
+            )
         }
         // Ctrl+Return → plain text, bare Return → original format.
         if event.keyCode == 36 {
-            return trackedModifiers.contains(.control)
-                ? .paste(.plainText)
-                : .paste(.original)
+            let action: ViewerAction = trackedModifiers.contains(.control)
+                ? .paste(.plainText) : .paste(.original)
+            return .action(action)
         }
         if trackedModifiers.contains(.control) {
-            return handleControl(event: event)
+            return result(for: handleControl(event: event))
         }
-        return handlePlain(event: event)
+        return result(for: handlePlain(event: event))
     }
 
-    private static func handleCommandShift(event: NSEvent) -> ViewerAction? {
-        // Match by produced character, not keyCode: kVK_ANSI_* codes are
-        // physical ANSI positions, so keyCode matching breaks on JIS and
-        // other layouts. charactersIgnoringModifiers applies Shift, so the
-        // bracket keys report "{" / "}"; accept the unshifted forms too.
-        switch event.charactersIgnoringModifiers {
+    static func action(
+        event: NSEvent,
+        trackedModifiers: NSEvent.ModifierFlags = [],
+        translateCharacter: CharacterTranslator? = nil
+    ) -> ViewerAction? {
+        guard case .action(let action) = handle(
+            event: event,
+            trackedModifiers: trackedModifiers,
+            translateCharacter: translateCharacter
+        ) else { return nil }
+        return action
+    }
+
+    private static func handleLayoutRequiredOptionShortcut(
+        event: NSEvent,
+        translateCharacter: CharacterTranslator?
+    ) -> ViewerKeyHandlingResult {
+        let withOption = translatedCharacter(
+            event: event,
+            modifiers: [.option, .shift],
+            translateCharacter: translateCharacter
+        )
+        guard let action = tabAction(for: withOption) else { return .unhandled }
+
+        let withoutOption = translatedCharacter(
+            event: event,
+            modifiers: .shift,
+            translateCharacter: translateCharacter
+        )
+        guard tabAction(for: withoutOption) == nil else { return .unhandled }
+        return .action(action)
+    }
+
+    private static func translatedCharacter(
+        event: NSEvent,
+        modifiers: NSEvent.ModifierFlags,
+        translateCharacter: CharacterTranslator?
+    ) -> String? {
+        if let translateCharacter {
+            return translateCharacter(modifiers)
+        }
+        return event.characters(byApplyingModifiers: modifiers)
+    }
+
+    private static func tabAction(for character: String?) -> ViewerAction? {
+        switch character {
         case "[", "{": .switchTab(.backward)
         case "]", "}": .switchTab(.forward)
         default: nil
         }
+    }
+
+    private static func result(for action: ViewerAction?) -> ViewerKeyHandlingResult {
+        action.map(ViewerKeyHandlingResult.action) ?? .unhandled
     }
 
     private static func handleControl(event: NSEvent) -> ViewerAction? {

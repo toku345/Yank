@@ -92,6 +92,46 @@ final class ViewerPanelTests: XCTestCase {
         XCTAssertEqual(state.selectedTab, .history)
     }
 
+    func testHandleViewerKeyDown_commandShiftReturnIsConsumed() throws {
+        let state = ViewerState()
+        let panel = makePanel(viewerState: state)
+        panel.sendEvent(
+            try makeFlagsChangedEvent(modifierFlags: [.command, .shift])
+        )
+
+        let wasHandled = panel.handleViewerKeyDown(
+            try makeCharacterEvent(
+                character: "",
+                keyCode: 36,
+                modifierFlags: [.command, .shift]
+            )
+        )
+
+        XCTAssertTrue(wasHandled)
+        XCTAssertNil(state.pendingAction)
+    }
+
+    func testSendEvent_modifierReleaseRestoresEscapeClose() throws {
+        let state = ViewerState()
+        let panel = makePanel(viewerState: state)
+
+        panel.sendEvent(
+            try makeFlagsChangedEvent(modifierFlags: [.command, .shift])
+        )
+        panel.sendEvent(
+            try makeFlagsChangedEvent(modifierFlags: [])
+        )
+        panel.sendEvent(
+            try makeCharacterEvent(
+                character: "",
+                keyCode: 53,
+                modifierFlags: []
+            )
+        )
+
+        XCTAssertEqual(state.pendingAction, .close)
+    }
+
     private func makePanel(viewerState: ViewerState) -> ViewerPanel {
         ViewerPanel(
             viewerState: viewerState,

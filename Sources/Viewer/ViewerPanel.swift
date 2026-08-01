@@ -48,19 +48,31 @@ final class ViewerPanel: NSPanel {
             trackedModifiers = event.modifierFlags
                 .intersection(.deviceIndependentFlagsMask)
         }
-        if event.type == .keyDown,
-           let action = EmacsKeyHandler.handle(
-               event: event, trackedModifiers: trackedModifiers
-           ) {
+        if event.type == .keyDown, handleViewerKeyDown(event) {
+            return
+        }
+        super.sendEvent(event)
+    }
+
+    @discardableResult
+    func handleViewerKeyDown(_ event: NSEvent) -> Bool {
+        switch EmacsKeyHandler.handle(
+            event: event,
+            trackedModifiers: trackedModifiers
+        ) {
+        case .action(let action):
             guard ViewerActionDispatchPolicy.shouldDispatch(
                 action: action,
                 isRepeat: event.isARepeat,
                 age: currentUptime() - event.timestamp
-            ) else { return }
+            ) else { return true }
             viewerState.perform(action)
-            return
+            return true
+        case .consumed:
+            return true
+        case .unhandled:
+            return false
         }
-        super.sendEvent(event)
     }
 
     func resetTrackedModifiers() {

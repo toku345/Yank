@@ -46,23 +46,42 @@ final class EmacsKeyHandlerTabShortcutTests: XCTestCase {
             character: "}",
             modifierFlags: [.command, .shift]
         )
-        XCTAssertNil(EmacsKeyHandler.handle(event: event, trackedModifiers: []))
+        XCTAssertNil(EmacsKeyHandler.action(event: event, trackedModifiers: []))
     }
 
-    // The tab shortcut requires the exact Cmd+Shift chord; superset chords
-    // must stay inert so a `.contains`-style refactor of the modifier gate
-    // cannot silently widen the shortcut.
-    func testCommandShiftOptionBracket_doesNotSwitchTab() {
+    func testCommandShiftOptionBracket_whenOptionIsLayoutRequired_switchesTab() {
         let event = makeKeyEvent(
             keyCode: 30,
             character: "}",
             modifierFlags: [.command, .shift, .option]
         )
-        XCTAssertNil(
+        XCTAssertEqual(
             EmacsKeyHandler.handle(
                 event: event,
-                trackedModifiers: [.command, .shift, .option]
-            )
+                trackedModifiers: [.command, .shift, .option],
+                translateCharacter: { modifiers in
+                    modifiers.contains(.option) ? "}" : "0"
+                }
+            ),
+            .action(.switchTab(.forward))
+        )
+    }
+
+    // Option is accepted only when the current layout needs it to produce
+    // the bracket. A redundant Option modifier remains an unrelated chord.
+    func testCommandShiftOptionBracket_whenOptionIsNotRequired_isUnhandled() {
+        let event = makeKeyEvent(
+            keyCode: 30,
+            character: "}",
+            modifierFlags: [.command, .shift, .option]
+        )
+        XCTAssertEqual(
+            EmacsKeyHandler.handle(
+                event: event,
+                trackedModifiers: [.command, .shift, .option],
+                translateCharacter: { _ in "}" }
+            ),
+            .unhandled
         )
     }
 
@@ -72,11 +91,12 @@ final class EmacsKeyHandlerTabShortcutTests: XCTestCase {
             character: "}",
             modifierFlags: [.command, .shift, .control]
         )
-        XCTAssertNil(
+        XCTAssertEqual(
             EmacsKeyHandler.handle(
                 event: event,
                 trackedModifiers: [.command, .shift, .control]
-            )
+            ),
+            .unhandled
         )
     }
 
@@ -86,15 +106,15 @@ final class EmacsKeyHandlerTabShortcutTests: XCTestCase {
     // are active; Return/Escape/Delete must not fire their unmodified
     // actions (paste/close/delete). Intentional per ADR 0012.
     func testCommandShiftReturn_doesNotPaste() {
-        XCTAssertNil(commandShiftAction(keyCode: 36))
+        XCTAssertEqual(commandShiftResult(keyCode: 36), .consumed)
     }
 
     func testCommandShiftEscape_doesNotClose() {
-        XCTAssertNil(commandShiftAction(keyCode: 53))
+        XCTAssertEqual(commandShiftResult(keyCode: 53), .consumed)
     }
 
     func testCommandShiftDelete_doesNotDeleteSelectedItem() {
-        XCTAssertNil(commandShiftAction(keyCode: 51))
+        XCTAssertEqual(commandShiftResult(keyCode: 51), .consumed)
     }
 
     // MARK: - C-f / C-b stay unbound for a future snippet editor (ADR 0012)
@@ -102,14 +122,14 @@ final class EmacsKeyHandlerTabShortcutTests: XCTestCase {
     func testControlF_doesNotSwitchTab() {
         let event = makeControlKeyEvent(character: "f")
         XCTAssertNil(
-            EmacsKeyHandler.handle(event: event, trackedModifiers: .control)
+            EmacsKeyHandler.action(event: event, trackedModifiers: .control)
         )
     }
 
     func testControlB_doesNotSwitchTab() {
         let event = makeControlKeyEvent(character: "b")
         XCTAssertNil(
-            EmacsKeyHandler.handle(event: event, trackedModifiers: .control)
+            EmacsKeyHandler.action(event: event, trackedModifiers: .control)
         )
     }
 
@@ -119,13 +139,29 @@ final class EmacsKeyHandlerTabShortcutTests: XCTestCase {
         keyCode: UInt16,
         character: String = ""
     ) -> ViewerAction? {
+        EmacsKeyHandler.action(
+            event: makeKeyEvent(
+                keyCode: keyCode,
+                character: character,
+                modifierFlags: [.command, .shift]
+            ),
+            trackedModifiers: [.command, .shift],
+            translateCharacter: { _ in character }
+        )
+    }
+
+    private func commandShiftResult(
+        keyCode: UInt16,
+        character: String = ""
+    ) -> ViewerKeyHandlingResult {
         EmacsKeyHandler.handle(
             event: makeKeyEvent(
                 keyCode: keyCode,
                 character: character,
                 modifierFlags: [.command, .shift]
             ),
-            trackedModifiers: [.command, .shift]
+            trackedModifiers: [.command, .shift],
+            translateCharacter: { _ in character }
         )
     }
 
