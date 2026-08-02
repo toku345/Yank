@@ -6,6 +6,10 @@ struct YankApp: App {
 
     var body: some Scene {
         MenuBarExtra("Yank", systemImage: "clipboard") {
+            Button("Manage Snippets…") {
+                appDelegate.coordinator.showSnippetEditor()
+            }
+            Divider()
             Button("About Yank") {
                 NSApplication.shared.orderFrontStandardAboutPanel()
             }

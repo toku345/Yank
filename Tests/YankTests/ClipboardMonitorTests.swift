@@ -453,4 +453,23 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertEqual(delegate.applicationShouldTerminate(application), .terminateNow)
         XCTAssertEqual(events.values.filter { $0 == "reply" }.count, 1)
     }
+
+    func testApplicationShouldTerminateCancelsBeforeShutdownWhenPreparationFails() {
+        var preparationCount = 0
+        let application = NSApplication.shared
+        let delegate = AppDelegate(
+            coordinator: AppCoordinator(),
+            prepareForTermination: {
+                preparationCount += 1
+                return false
+            },
+            beginShutdown: { XCTFail("Shutdown must not begin") },
+            finishShutdown: { XCTFail("Shutdown must not finish") },
+            replyToTermination: { _, _ in XCTFail("Termination must not receive a deferred reply") }
+        )
+
+        XCTAssertEqual(delegate.applicationShouldTerminate(application), .terminateCancel)
+        XCTAssertEqual(delegate.applicationShouldTerminate(application), .terminateCancel)
+        XCTAssertEqual(preparationCount, 2)
+    }
 }
