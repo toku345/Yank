@@ -14,6 +14,9 @@ struct ViewerContentView: View {
     @Query(sort: \ClipItem.createdAt, order: .reverse)
     private var clipItems: [ClipItem]
 
+    @Query(sort: \SnippetFolder.sortOrder)
+    private var snippetFolders: [SnippetFolder]
+
     @Bindable var viewerState: ViewerState
     @State private var isClearingHistory = false
 
@@ -41,8 +44,26 @@ struct ViewerContentView: View {
             handleViewAction(action)
         }
         .onChange(of: clipItems.map(\.persistentModelID)) { _, newIDs in
-            viewerState.replaceItems(with: newIDs)
+            viewerState.replaceHistoryItems(with: newIDs)
         }
+        .onAppear {
+            synchronizeSnippetSelection(with: snippetCollectionSnapshot)
+        }
+        .onChange(of: snippetCollectionSnapshot) { _, snapshot in
+            synchronizeSnippetSelection(with: snapshot)
+        }
+    }
+
+    private var snippetCollectionSnapshot: [SnippetCollectionSnapshot] {
+        SnippetCollectionProjection.snapshots(from: snippetFolders)
+    }
+
+    private func synchronizeSnippetSelection(
+        with snapshot: [SnippetCollectionSnapshot]
+    ) {
+        viewerState.replaceSnippets(
+            with: SnippetCollectionProjection.selectableSnippetIDs(from: snapshot)
+        )
     }
 
     private var historyContent: some View {
@@ -81,7 +102,7 @@ struct ViewerContentView: View {
                 Button("Delete Selected") {
                     viewerState.perform(.deleteSelected)
                 }
-                .disabled(viewerState.selectedID == nil || isClearingHistory)
+                .disabled(viewerState.selectedHistoryID == nil || isClearingHistory)
 
                 Spacer()
 
@@ -107,7 +128,7 @@ struct ViewerContentView: View {
     private func handleHistoryAction(_ action: ViewerAction) {
         switch action {
         case .paste(let format):
-            if let id = viewerState.selectedID,
+            if let id = viewerState.selectedHistoryID,
                let item = clipItems.first(where: { $0.persistentModelID == id }) {
                 onPaste(item, format)
             }
@@ -145,7 +166,7 @@ struct ViewerContentView: View {
             defer { isClearingHistory = false }
             do {
                 try await onClearHistory()
-                viewerState.clearItems()
+                viewerState.clearHistoryItems()
             } catch {
                 reportDeletionFailure(operation: "clear clipboard history", error: error)
             }
@@ -169,7 +190,7 @@ struct ViewerContentView: View {
         Self.logger.error(
             """
             Failed to \(operation, privacy: .public); \
-            selectedID=\(String(describing: viewerState.selectedID), privacy: .public); \
+            selectedID=\(String(describing: viewerState.selectedHistoryID), privacy: .public); \
             itemCount=\(clipItems.count, privacy: .public); \
             errorType=\(String(reflecting: type(of: error)), privacy: .public); \
             error=\(error.localizedDescription, privacy: .public)
@@ -224,19 +245,19 @@ enum HistoryDeletion {
         viewerState: ViewerState,
         saveChanges: SaveChanges = { try $0.save() }
     ) throws -> DeleteSelectedResult {
-        guard let selectedID = viewerState.selectedID else {
-            viewerState.replaceItems(with: items.map(\.persistentModelID))
+        guard let selectedID = viewerState.selectedHistoryID else {
+            viewerState.replaceHistoryItems(with: items.map(\.persistentModelID))
             return .noSelection
         }
 
         guard let item = items.first(where: { $0.persistentModelID == selectedID }) else {
-            viewerState.replaceItems(with: items.map(\.persistentModelID))
+            viewerState.replaceHistoryItems(with: items.map(\.persistentModelID))
             return .selectedItemMissing(selectedID)
         }
 
         modelContext.delete(item)
         try saveOrRollback(in: modelContext, saveChanges: saveChanges)
-        viewerState.removeItem(id: selectedID)
+        viewerState.removeHistoryItem(id: selectedID)
         return .deleted
     }
 

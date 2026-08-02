@@ -15,26 +15,26 @@ final class HistoryRowContractTests: XCTestCase {
         let fixture = try makeFixture()
         let contract = makeContract(for: fixture.item, in: fixture)
 
-        XCTAssertNil(fixture.viewerState.selectedID)
+        XCTAssertNil(fixture.viewerState.selectedHistoryID)
         XCTAssertFalse(contract.isSelected)
 
-        fixture.viewerState.selectedID = fixture.otherItem.persistentModelID
+        fixture.viewerState.selectedHistoryID = fixture.otherItem.persistentModelID
         XCTAssertFalse(contract.isSelected)
 
-        fixture.viewerState.selectedID = fixture.item.persistentModelID
+        fixture.viewerState.selectedHistoryID = fixture.item.persistentModelID
         XCTAssertTrue(contract.isSelected)
     }
 
     func testActivateSelectsItemBeforeCallingCallback() throws {
         let fixture = try makeFixture()
-        fixture.viewerState.selectedID = fixture.otherItem.persistentModelID
+        fixture.viewerState.selectedHistoryID = fixture.otherItem.persistentModelID
         var selectedIDDuringCallback: PersistentIdentifier?
         var activatedItem: ClipItem?
         let contract = HistoryRowContract(
             item: fixture.item,
             viewerState: fixture.viewerState,
             onActivate: { item in
-                selectedIDDuringCallback = fixture.viewerState.selectedID
+                selectedIDDuringCallback = fixture.viewerState.selectedHistoryID
                 activatedItem = item
             }
         )
@@ -47,7 +47,7 @@ final class HistoryRowContractTests: XCTestCase {
         )
         XCTAssertTrue(activatedItem === fixture.item)
         XCTAssertEqual(
-            fixture.viewerState.selectedID,
+            fixture.viewerState.selectedHistoryID,
             fixture.item.persistentModelID
         )
     }
@@ -59,7 +59,7 @@ final class HistoryRowContractTests: XCTestCase {
         contract.activate()
 
         XCTAssertEqual(
-            fixture.viewerState.selectedID,
+            fixture.viewerState.selectedHistoryID,
             fixture.item.persistentModelID
         )
     }

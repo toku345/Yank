@@ -15,7 +15,7 @@ final class ViewerPanelTests: XCTestCase {
             try makeDownArrowEvent(timestamp: 9.899, isARepeat: true)
         )
 
-        XCTAssertNil(state.selectedID)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testSendEvent_freshRepeatedMoveDispatches() throws {
@@ -26,7 +26,7 @@ final class ViewerPanelTests: XCTestCase {
             try makeDownArrowEvent(timestamp: 9.901, isARepeat: true)
         )
 
-        XCTAssertEqual(state.selectedID, itemID)
+        XCTAssertEqual(state.selectedHistoryID, itemID)
     }
 
     func testSendEvent_nonRepeatedMoveDispatchesRegardlessOfAge() throws {
@@ -37,7 +37,7 @@ final class ViewerPanelTests: XCTestCase {
             try makeDownArrowEvent(timestamp: 9.899, isARepeat: false)
         )
 
-        XCTAssertEqual(state.selectedID, itemID)
+        XCTAssertEqual(state.selectedHistoryID, itemID)
     }
 
     func testSendEvent_commandShiftRightBracketSwitchesTabForward() throws {
@@ -160,7 +160,7 @@ final class ViewerPanelTests: XCTestCase {
         try context.save()
 
         let state = ViewerState()
-        state.itemIDs = [item.persistentModelID]
+        state.historyItemIDs = [item.persistentModelID]
         return (state, item.persistentModelID)
     }
 
