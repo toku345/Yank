@@ -160,7 +160,8 @@ final class ViewerPanelTests: XCTestCase {
         try context.save()
 
         let state = ViewerState()
-        state.historyItemIDs = [item.persistentModelID]
+        state.replaceHistoryItems(with: [item.persistentModelID])
+        state.selectedHistoryID = nil
         return (state, item.persistentModelID)
     }
 

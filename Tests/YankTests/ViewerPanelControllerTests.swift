@@ -32,7 +32,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         let staleID = fixture.items[2].persistentModelID
         let loadedIDs = [newestID, olderID]
         let state = ViewerState()
-        state.historyItemIDs = [staleID, olderID]
+        state.replaceHistoryItems(with: [staleID, olderID])
         state.selectedHistoryID = olderID
         var presentationCount = 0
 
@@ -64,7 +64,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         let loadedIDs = [newestID, olderID]
         let state = ViewerState()
         state.selectedTab = .snippets
-        state.historyItemIDs = loadedIDs
+        state.replaceHistoryItems(with: loadedIDs)
         state.selectedHistoryID = olderID
         var presentationCount = 0
 
@@ -88,7 +88,7 @@ final class ViewerPanelControllerTests: XCTestCase {
     func testShow_emptySnapshotClearsStateAndPresentsEmptyViewer() throws {
         let fixture = try makeItemFixture(count: 1)
         let state = ViewerState()
-        state.historyItemIDs = fixture.items.map(\.persistentModelID)
+        state.replaceHistoryItems(with: fixture.items.map(\.persistentModelID))
         state.selectedHistoryID = state.historyItemIDs.first
         var presentationCount = 0
 
@@ -116,7 +116,7 @@ final class ViewerPanelControllerTests: XCTestCase {
     func testShow_failureClearsStateBeforeReportingAndDoesNotPresent() throws {
         let fixture = try makeItemFixture(count: 1)
         let state = ViewerState()
-        state.historyItemIDs = fixture.items.map(\.persistentModelID)
+        state.replaceHistoryItems(with: fixture.items.map(\.persistentModelID))
         state.selectedHistoryID = state.historyItemIDs.first
         var reportCount = 0
         var presentationCount = 0
@@ -146,7 +146,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         let fixture = try makeItemFixture(count: 1)
         let state = ViewerState()
         state.selectedTab = .snippets
-        state.historyItemIDs = fixture.items.map(\.persistentModelID)
+        state.replaceHistoryItems(with: fixture.items.map(\.persistentModelID))
         state.selectedHistoryID = state.historyItemIDs.first
         var reportCount = 0
         var presentationCount = 0

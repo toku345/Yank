@@ -18,9 +18,9 @@ final class ViewerSnippetStateTests: XCTestCase {
     func testSwitchTabRoundTripPreservesBothSelections() throws {
         let historyIDs = try makeHistoryIDs(count: 2)
         let snippetIDs = try makeSnippetIDs(count: 2)
-        state.historyItemIDs = historyIDs
+        state.replaceHistoryItems(with: historyIDs)
         state.selectedHistoryID = historyIDs[1]
-        state.snippetIDs = snippetIDs
+        state.replaceSnippets(with: snippetIDs)
         state.selectedSnippetID = snippetIDs[1]
 
         state.perform(.switchTab(.forward))
@@ -35,7 +35,7 @@ final class ViewerSnippetStateTests: XCTestCase {
     func testSnippetMovementUpdatesSnippetSelectionOnly() throws {
         let historyIDs = try makeHistoryIDs(count: 3)
         let snippetIDs = try makeSnippetIDs(count: 3)
-        state.historyItemIDs = historyIDs
+        state.replaceHistoryItems(with: historyIDs)
         state.selectedHistoryID = historyIDs[1]
         state.replaceSnippets(with: snippetIDs)
         state.selectedTab = .snippets

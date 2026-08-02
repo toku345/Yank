@@ -56,9 +56,9 @@ final class ViewerState {
 
     var selectedTab: ViewerTab = .history
     var selectedHistoryID: PersistentIdentifier?
-    var historyItemIDs: [PersistentIdentifier] = []
+    private(set) var historyItemIDs: [PersistentIdentifier] = []
     var selectedSnippetID: PersistentIdentifier?
-    var snippetIDs: [PersistentIdentifier] = []
+    private(set) var snippetIDs: [PersistentIdentifier] = []
 
     func perform(_ action: ViewerAction) {
         switch action {

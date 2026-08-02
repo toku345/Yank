@@ -91,7 +91,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testMoveDown_fromFirst_selectsSecond() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[0]
 
         state.perform(.move(.down))
@@ -101,7 +101,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testMoveDown_fromLast_staysAtLast() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[2]
 
         state.perform(.move(.down))
@@ -111,7 +111,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testMoveDown_noSelection_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = nil
 
         state.perform(.move(.down))
@@ -123,7 +123,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testMoveUp_fromSecond_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[1]
 
         state.perform(.move(.up))
@@ -133,7 +133,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testMoveUp_fromFirst_staysAtFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[0]
 
         state.perform(.move(.up))
@@ -143,7 +143,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testMoveUp_noSelection_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = nil
 
         state.perform(.move(.up))
@@ -152,7 +152,7 @@ final class ViewerStateTests: XCTestCase {
     }
 
     func testMoveUp_emptyItems_doesNothing() {
-        state.historyItemIDs = []
+        state.replaceHistoryItems(with: [])
         state.selectedHistoryID = nil
 
         state.perform(.move(.up))
@@ -164,7 +164,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testJumpToStart_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[2]
 
         state.perform(.jumpToStart)
@@ -174,7 +174,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testJumpToEnd_selectsLast() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[0]
 
         state.perform(.jumpToEnd)
@@ -212,7 +212,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testRemoveItem_fromMiddle_selectsNextItem() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[1]
 
         state.removeHistoryItem(id: ids[1])
@@ -223,7 +223,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testRemoveItem_fromLast_selectsPreviousItem() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[2]
 
         state.removeHistoryItem(id: ids[2])
@@ -234,7 +234,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testRemoveItem_onlyItem_clearsSelection() throws {
         let ids = try makeItemIDs(count: 1)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[0]
 
         state.removeHistoryItem(id: ids[0])
@@ -245,7 +245,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testReplaceItems_whenSelectionWasDeleted_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[1]
 
         state.replaceHistoryItems(with: [ids[0], ids[2]])
@@ -256,7 +256,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testReplaceItems_whenSelectionStillPresent_keepsSelection() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[1]
 
         // A newer item is prepended (newest-first) while the current
@@ -271,7 +271,7 @@ final class ViewerStateTests: XCTestCase {
     // MARK: - Edge cases
 
     func testMoveDown_emptyItems_doesNothing() {
-        state.historyItemIDs = []
+        state.replaceHistoryItems(with: [])
         state.selectedHistoryID = nil
 
         state.perform(.move(.down))
@@ -280,7 +280,7 @@ final class ViewerStateTests: XCTestCase {
     }
 
     func testJumpToStart_emptyItems_setsNil() {
-        state.historyItemIDs = []
+        state.replaceHistoryItems(with: [])
 
         state.perform(.jumpToStart)
 
@@ -288,7 +288,7 @@ final class ViewerStateTests: XCTestCase {
     }
 
     func testJumpToEnd_emptyItems_setsNil() {
-        state.historyItemIDs = []
+        state.replaceHistoryItems(with: [])
 
         state.perform(.jumpToEnd)
 
@@ -299,7 +299,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testRapidMoveDown_advancesEveryStep() throws {
         let ids = try makeItemIDs(count: 5)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[0]
 
         for _ in 0..<4 {
@@ -311,7 +311,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testRapidMoveDown_clampedAtEnd() throws {
         let ids = try makeItemIDs(count: 3)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[0]
 
         for _ in 0..<10 {
@@ -323,7 +323,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testRapidMoveUp_advancesEveryStep() throws {
         let ids = try makeItemIDs(count: 5)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[4]
 
         for _ in 0..<4 {
@@ -335,7 +335,7 @@ final class ViewerStateTests: XCTestCase {
 
     func testOneHundredMovesInLargeHistory_advancesOneHundredRows() throws {
         let ids = try makeItemIDs(count: 1_000)
-        state.historyItemIDs = ids
+        state.replaceHistoryItems(with: ids)
         state.selectedHistoryID = ids[0]
 
         for _ in 0..<100 {
