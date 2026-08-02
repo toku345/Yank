@@ -78,6 +78,11 @@ final class ViewerContentLifecycleTests: XCTestCase {
         let window: NSWindow
     }
 
+    private struct AdditionalFolder {
+        let folderID: PersistentIdentifier
+        let snippetID: PersistentIdentifier
+    }
+
     func testMountedViewSynchronizesSnippetSelectionAcrossEditorMutations() async throws {
         let fixture = try makeFixture()
         defer { fixture.window.contentView = nil }
@@ -173,6 +178,69 @@ final class ViewerContentLifecycleTests: XCTestCase {
             selectedSnippetID: fixture.secondID,
             recorder: fixture.recorder,
             description: "mounted viewer synchronized cross-folder move"
+        )
+    }
+
+    func testMountedViewSynchronizesFolderReorderingAndDeletion() async throws {
+        let fixture = try makeFixture()
+        defer { fixture.window.contentView = nil }
+
+        await waitForSnippetState(
+            [fixture.firstID, fixture.secondID],
+            selectedSnippetID: fixture.firstID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized initial snippets"
+        )
+
+        let additional = try addFolderWithSnippet(in: fixture.context)
+        await waitForSnippetState(
+            [fixture.firstID, fixture.secondID, additional.snippetID],
+            selectedSnippetID: fixture.firstID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized additional folder"
+        )
+
+        fixture.state.selectedSnippetID = fixture.secondID
+        XCTAssertTrue(try SnippetMutations.moveFolder(
+            id: additional.folderID,
+            before: fixture.folder.persistentModelID,
+            in: fixture.context
+        ))
+        await waitForSnippetState(
+            [additional.snippetID, fixture.firstID, fixture.secondID],
+            selectedSnippetID: fixture.secondID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized reordered folders"
+        )
+
+        let result = try SnippetMutations.deleteFolder(
+            id: fixture.folder.persistentModelID,
+            in: fixture.context
+        )
+        XCTAssertEqual(result.selectedSnippetID, additional.snippetID)
+        await waitForSnippetState(
+            [additional.snippetID],
+            selectedSnippetID: additional.snippetID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized deleted folder"
+        )
+    }
+
+    private func addFolderWithSnippet(in context: ModelContext) throws -> AdditionalFolder {
+        let folderResult = try SnippetMutations.createFolder(
+            title: "Additional",
+            in: context
+        )
+        let folderID = try XCTUnwrap(folderResult.selectedFolderID)
+        let snippetResult = try SnippetMutations.createSnippet(
+            title: "Additional Snippet",
+            content: "additional",
+            folderID: folderID,
+            in: context
+        )
+        return AdditionalFolder(
+            folderID: folderID,
+            snippetID: try XCTUnwrap(snippetResult.selectedSnippetID)
         )
     }
 
