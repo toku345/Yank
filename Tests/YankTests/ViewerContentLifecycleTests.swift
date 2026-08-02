@@ -130,6 +130,52 @@ final class ViewerContentLifecycleTests: XCTestCase {
         )
     }
 
+    func testMountedViewSynchronizesSelectedSnippetMovedAcrossFolders() async throws {
+        let fixture = try makeFixture()
+        defer { fixture.window.contentView = nil }
+
+        await waitForSnippetState(
+            [fixture.firstID, fixture.secondID],
+            selectedSnippetID: fixture.firstID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized initial snippets"
+        )
+
+        let folderResult = try SnippetMutations.createFolder(
+            title: "Destination",
+            in: fixture.context
+        )
+        let destinationID = try XCTUnwrap(folderResult.selectedFolderID)
+        let createResult = try SnippetMutations.createSnippet(
+            title: "Existing",
+            content: "existing",
+            folderID: destinationID,
+            in: fixture.context
+        )
+        let existingID = try XCTUnwrap(createResult.selectedSnippetID)
+        await waitForSnippetState(
+            [fixture.firstID, fixture.secondID, existingID],
+            selectedSnippetID: fixture.firstID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized destination folder"
+        )
+
+        fixture.state.selectedSnippetID = fixture.secondID
+        let moveResult = try SnippetMutations.moveSnippet(
+            id: fixture.secondID,
+            to: destinationID,
+            before: nil,
+            in: fixture.context
+        )
+        XCTAssertEqual(moveResult?.selectedSnippetID, fixture.secondID)
+        await waitForSnippetState(
+            [fixture.firstID, existingID, fixture.secondID],
+            selectedSnippetID: fixture.secondID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized cross-folder move"
+        )
+    }
+
     private func makeFixture() throws -> Fixture {
         let container = try makeContainer()
         let context = container.mainContext
