@@ -1,13 +1,6 @@
 import SwiftData
 import SwiftUI
 
-struct SnippetCollectionSnapshot: Equatable {
-    let folderID: PersistentIdentifier
-    let title: String
-    let sortOrder: Int
-    let snippetIDs: [PersistentIdentifier]
-}
-
 enum FolderEditorSheet: Identifiable {
     case create
     case rename(id: PersistentIdentifier, title: String)
@@ -72,14 +65,7 @@ struct SnippetEditorView: View {
     }
 
     private var collectionSnapshot: [SnippetCollectionSnapshot] {
-        orderedFolders.map { folder in
-            SnippetCollectionSnapshot(
-                folderID: folder.persistentModelID,
-                title: folder.title,
-                sortOrder: folder.sortOrder,
-                snippetIDs: SnippetOrdering.snippets(folder.snippets).map(\.persistentModelID)
-            )
-        }
+        SnippetCollectionProjection.snapshots(from: folders)
     }
 
     var folderSelection: Binding<PersistentIdentifier?> {

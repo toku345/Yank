@@ -69,31 +69,6 @@ final class ViewerStateTests: XCTestCase {
         XCTAssertEqual(state.selectedTab, .history)
     }
 
-    func testSwitchTabRoundTrip_preservesHistorySelection() throws {
-        let ids = try makeItemIDs(count: 2)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
-
-        state.perform(.switchTab(.forward))
-        state.perform(.switchTab(.backward))
-
-        XCTAssertEqual(state.itemIDs, ids)
-        XCTAssertEqual(state.selectedID, ids[1])
-    }
-
-    func testHistoryMovementActions_areIgnoredInSnippets() throws {
-        let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
-        state.selectedTab = .snippets
-
-        state.perform(.move(.down))
-        state.perform(.jumpToStart)
-        state.perform(.jumpToEnd)
-
-        XCTAssertEqual(state.selectedID, ids[1])
-    }
-
     func testHistoryViewActions_areIgnoredInSnippets() {
         state.selectedTab = .snippets
 
@@ -116,95 +91,95 @@ final class ViewerStateTests: XCTestCase {
 
     func testMoveDown_fromFirst_selectsSecond() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
         state.perform(.move(.down))
 
-        XCTAssertEqual(state.selectedID, ids[1])
+        XCTAssertEqual(state.selectedHistoryID, ids[1])
     }
 
     func testMoveDown_fromLast_staysAtLast() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[2]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[2]
 
         state.perform(.move(.down))
 
-        XCTAssertEqual(state.selectedID, ids[2])
+        XCTAssertEqual(state.selectedHistoryID, ids[2])
     }
 
     func testMoveDown_noSelection_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = nil
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = nil
 
         state.perform(.move(.down))
 
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     // MARK: - move(.up)
 
     func testMoveUp_fromSecond_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[1]
 
         state.perform(.move(.up))
 
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testMoveUp_fromFirst_staysAtFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
         state.perform(.move(.up))
 
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testMoveUp_noSelection_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = nil
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = nil
 
         state.perform(.move(.up))
 
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testMoveUp_emptyItems_doesNothing() {
-        state.itemIDs = []
-        state.selectedID = nil
+        state.replaceHistoryItems(with: [])
+        state.selectedHistoryID = nil
 
         state.perform(.move(.up))
 
-        XCTAssertNil(state.selectedID)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     // MARK: - jumpToStart / jumpToEnd
 
     func testJumpToStart_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[2]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[2]
 
         state.perform(.jumpToStart)
 
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testJumpToEnd_selectsLast() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
         state.perform(.jumpToEnd)
 
-        XCTAssertEqual(state.selectedID, ids[2])
+        XCTAssertEqual(state.selectedHistoryID, ids[2])
     }
 
     // MARK: - pendingAction routing
@@ -237,136 +212,136 @@ final class ViewerStateTests: XCTestCase {
 
     func testRemoveItem_fromMiddle_selectsNextItem() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[1]
 
-        state.removeItem(id: ids[1])
+        state.removeHistoryItem(id: ids[1])
 
-        XCTAssertEqual(state.itemIDs, [ids[0], ids[2]])
-        XCTAssertEqual(state.selectedID, ids[2])
+        XCTAssertEqual(state.historyItemIDs, [ids[0], ids[2]])
+        XCTAssertEqual(state.selectedHistoryID, ids[2])
     }
 
     func testRemoveItem_fromLast_selectsPreviousItem() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[2]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[2]
 
-        state.removeItem(id: ids[2])
+        state.removeHistoryItem(id: ids[2])
 
-        XCTAssertEqual(state.itemIDs, [ids[0], ids[1]])
-        XCTAssertEqual(state.selectedID, ids[1])
+        XCTAssertEqual(state.historyItemIDs, [ids[0], ids[1]])
+        XCTAssertEqual(state.selectedHistoryID, ids[1])
     }
 
     func testRemoveItem_onlyItem_clearsSelection() throws {
         let ids = try makeItemIDs(count: 1)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
-        state.removeItem(id: ids[0])
+        state.removeHistoryItem(id: ids[0])
 
-        XCTAssertEqual(state.itemIDs, [])
-        XCTAssertNil(state.selectedID)
+        XCTAssertEqual(state.historyItemIDs, [])
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testReplaceItems_whenSelectionWasDeleted_selectsFirst() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[1]
 
-        state.replaceItems(with: [ids[0], ids[2]])
+        state.replaceHistoryItems(with: [ids[0], ids[2]])
 
-        XCTAssertEqual(state.itemIDs, [ids[0], ids[2]])
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.historyItemIDs, [ids[0], ids[2]])
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testReplaceItems_whenSelectionStillPresent_keepsSelection() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[1]
 
         // A newer item is prepended (newest-first) while the current
         // selection is still present; selection must not jump to the top.
         let newID = try makeItemIDs(count: 1)[0]
-        state.replaceItems(with: [newID] + ids)
+        state.replaceHistoryItems(with: [newID] + ids)
 
-        XCTAssertEqual(state.itemIDs, [newID] + ids)
-        XCTAssertEqual(state.selectedID, ids[1])
+        XCTAssertEqual(state.historyItemIDs, [newID] + ids)
+        XCTAssertEqual(state.selectedHistoryID, ids[1])
     }
 
     // MARK: - Edge cases
 
     func testMoveDown_emptyItems_doesNothing() {
-        state.itemIDs = []
-        state.selectedID = nil
+        state.replaceHistoryItems(with: [])
+        state.selectedHistoryID = nil
 
         state.perform(.move(.down))
 
-        XCTAssertNil(state.selectedID)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testJumpToStart_emptyItems_setsNil() {
-        state.itemIDs = []
+        state.replaceHistoryItems(with: [])
 
         state.perform(.jumpToStart)
 
-        XCTAssertNil(state.selectedID)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testJumpToEnd_emptyItems_setsNil() {
-        state.itemIDs = []
+        state.replaceHistoryItems(with: [])
 
         state.perform(.jumpToEnd)
 
-        XCTAssertNil(state.selectedID)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     // MARK: - Key repeat simulation (Issue #6 core test)
 
     func testRapidMoveDown_advancesEveryStep() throws {
         let ids = try makeItemIDs(count: 5)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
         for _ in 0..<4 {
             state.perform(.move(.down))
         }
 
-        XCTAssertEqual(state.selectedID, ids[4])
+        XCTAssertEqual(state.selectedHistoryID, ids[4])
     }
 
     func testRapidMoveDown_clampedAtEnd() throws {
         let ids = try makeItemIDs(count: 3)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
         for _ in 0..<10 {
             state.perform(.move(.down))
         }
 
-        XCTAssertEqual(state.selectedID, ids[2])
+        XCTAssertEqual(state.selectedHistoryID, ids[2])
     }
 
     func testRapidMoveUp_advancesEveryStep() throws {
         let ids = try makeItemIDs(count: 5)
-        state.itemIDs = ids
-        state.selectedID = ids[4]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[4]
 
         for _ in 0..<4 {
             state.perform(.move(.up))
         }
 
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testOneHundredMovesInLargeHistory_advancesOneHundredRows() throws {
         let ids = try makeItemIDs(count: 1_000)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
         for _ in 0..<100 {
             state.perform(.move(.down))
         }
 
-        XCTAssertEqual(state.selectedID, ids[100])
+        XCTAssertEqual(state.selectedHistoryID, ids[100])
     }
 }

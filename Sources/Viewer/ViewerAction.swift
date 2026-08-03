@@ -55,64 +55,63 @@ final class ViewerState {
     var pendingAction: ViewerAction?
 
     var selectedTab: ViewerTab = .history
-    var selectedID: PersistentIdentifier?
-    var itemIDs: [PersistentIdentifier] = []
+    var selectedHistoryID: PersistentIdentifier?
+    private(set) var historyItemIDs: [PersistentIdentifier] = []
+    var selectedSnippetID: PersistentIdentifier?
+    private(set) var snippetIDs: [PersistentIdentifier] = []
 
     func perform(_ action: ViewerAction) {
-        if case .switchTab(let direction) = action {
-            switchTab(direction)
-            return
-        }
-        if action == .close {
-            pendingAction = action
-            return
-        }
-        guard selectedTab == .history else { return }
-
         switch action {
-        case .move(let direction):
-            moveSelection(direction)
-        case .jumpToStart:
-            selectedID = itemIDs.first
-        case .jumpToEnd:
-            selectedID = itemIDs.last
-        case .paste, .deleteSelected, .clearHistory:
+        case .switchTab(let direction):
+            switchTab(direction)
+        case .close:
             pendingAction = action
-        case .switchTab, .close:
-            break
+        case .move(let direction):
+            moveActiveSelection(direction)
+        case .jumpToStart:
+            jumpActiveSelection(to: .start)
+        case .jumpToEnd:
+            jumpActiveSelection(to: .end)
+        case .paste, .deleteSelected, .clearHistory:
+            guard selectedTab == .history else { return }
+            pendingAction = action
         }
     }
 
-    func replaceItems(with newIDs: [PersistentIdentifier]) {
-        itemIDs = newIDs
+    func replaceHistoryItems(with newIDs: [PersistentIdentifier]) {
+        historyItemIDs = newIDs
+        selectedHistoryID = reconciledSelection(
+            selectedHistoryID,
+            in: newIDs
+        )
+    }
+
+    func removeHistoryItem(id: PersistentIdentifier) {
+        guard let removedIndex = historyItemIDs.firstIndex(of: id) else {
+            replaceHistoryItems(with: historyItemIDs)
+            return
+        }
+
+        let newIDs = historyItemIDs.filter { $0 != id }
+        historyItemIDs = newIDs
         guard !newIDs.isEmpty else {
-            selectedID = nil
+            selectedHistoryID = nil
             return
         }
-        if let selectedID, newIDs.contains(selectedID) {
-            return
-        }
-        selectedID = newIDs.first
+        selectedHistoryID = newIDs[min(removedIndex, newIDs.count - 1)]
     }
 
-    func removeItem(id: PersistentIdentifier) {
-        guard let removedIndex = itemIDs.firstIndex(of: id) else {
-            replaceItems(with: itemIDs)
-            return
-        }
-
-        let newIDs = itemIDs.filter { $0 != id }
-        itemIDs = newIDs
-        guard !newIDs.isEmpty else {
-            selectedID = nil
-            return
-        }
-        selectedID = newIDs[min(removedIndex, newIDs.count - 1)]
+    func clearHistoryItems() {
+        historyItemIDs = []
+        selectedHistoryID = nil
     }
 
-    func clearItems() {
-        itemIDs = []
-        selectedID = nil
+    func replaceSnippets(with newIDs: [PersistentIdentifier]) {
+        snippetIDs = newIDs
+        selectedSnippetID = reconciledSelection(
+            selectedSnippetID,
+            in: newIDs
+        )
     }
 
     private func switchTab(_ direction: ViewerAction.TabDirection) {
@@ -126,18 +125,65 @@ final class ViewerState {
         }
     }
 
-    private func moveSelection(_ direction: ViewerAction.Direction) {
-        guard !itemIDs.isEmpty else { return }
+    private enum JumpTarget {
+        case start, end
+    }
+
+    private func moveActiveSelection(_ direction: ViewerAction.Direction) {
+        switch selectedTab {
+        case .history:
+            selectedHistoryID = movedSelection(
+                selectedHistoryID,
+                in: historyItemIDs,
+                direction: direction
+            )
+        case .snippets:
+            selectedSnippetID = movedSelection(
+                selectedSnippetID,
+                in: snippetIDs,
+                direction: direction
+            )
+        }
+    }
+
+    private func jumpActiveSelection(to target: JumpTarget) {
+        switch (selectedTab, target) {
+        case (.history, .start):
+            selectedHistoryID = historyItemIDs.first
+        case (.history, .end):
+            selectedHistoryID = historyItemIDs.last
+        case (.snippets, .start):
+            selectedSnippetID = snippetIDs.first
+        case (.snippets, .end):
+            selectedSnippetID = snippetIDs.last
+        }
+    }
+
+    private func reconciledSelection(
+        _ selectedID: PersistentIdentifier?,
+        in newIDs: [PersistentIdentifier]
+    ) -> PersistentIdentifier? {
+        guard !newIDs.isEmpty else { return nil }
+        guard let selectedID, newIDs.contains(selectedID) else {
+            return newIDs.first
+        }
+        return selectedID
+    }
+
+    private func movedSelection(
+        _ selectedID: PersistentIdentifier?,
+        in itemIDs: [PersistentIdentifier],
+        direction: ViewerAction.Direction
+    ) -> PersistentIdentifier? {
+        guard !itemIDs.isEmpty else { return nil }
         let currentIndex = selectedID.flatMap { id in
             itemIDs.firstIndex(of: id)
         } ?? -1
         switch direction {
         case .down:
-            let newIndex = min(currentIndex + 1, itemIDs.count - 1)
-            selectedID = itemIDs[newIndex]
+            return itemIDs[min(currentIndex + 1, itemIDs.count - 1)]
         case .up:
-            let newIndex = max(currentIndex - 1, 0)
-            selectedID = itemIDs[newIndex]
+            return itemIDs[max(currentIndex - 1, 0)]
         }
     }
 }

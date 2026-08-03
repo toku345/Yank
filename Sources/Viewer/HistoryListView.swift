@@ -38,8 +38,8 @@ private struct SelectionScroller: View {
         Color.clear
             .accessibilityHidden(true)
             .allowsHitTesting(false)
-            .task(id: viewerState.selectedID) {
-                guard let id = viewerState.selectedID else { return }
+            .task(id: viewerState.selectedHistoryID) {
+                guard let id = viewerState.selectedHistoryID else { return }
                 do {
                     try await Task.sleep(for: .milliseconds(16))
                 } catch {
@@ -62,11 +62,11 @@ struct HistoryRowContract {
     }
 
     var isSelected: Bool {
-        viewerState.selectedID == item.persistentModelID
+        viewerState.selectedHistoryID == item.persistentModelID
     }
 
     func activate() {
-        viewerState.selectedID = item.persistentModelID
+        viewerState.selectedHistoryID = item.persistentModelID
         onActivate?(item)
     }
 }

@@ -17,8 +17,8 @@ final class HistoryDeletionTests: XCTestCase {
     func testDeleteSelectedItem_deletesSwiftDataRowAndSelectsNext() throws {
         let items = try makeItems(count: 3)
         let ids = items.map(\.persistentModelID)
-        state.itemIDs = ids
-        state.selectedID = ids[1]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[1]
 
         let result = try HistoryDeletion.deleteSelectedItem(
             from: items,
@@ -30,14 +30,14 @@ final class HistoryDeletionTests: XCTestCase {
         XCTAssertEqual(result, .deleted)
         XCTAssertEqual(fetched.count, 2)
         XCTAssertFalse(fetched.map(\.persistentModelID).contains(ids[1]))
-        XCTAssertEqual(state.selectedID, ids[2])
+        XCTAssertEqual(state.selectedHistoryID, ids[2])
     }
 
     func testDeleteSelectedItem_withoutSelectionDeletesNothingAndRepairsSelection() throws {
         let items = try makeItems(count: 2)
         let ids = items.map(\.persistentModelID)
-        state.itemIDs = []
-        state.selectedID = nil
+        state.replaceHistoryItems(with: [])
+        state.selectedHistoryID = nil
 
         let result = try HistoryDeletion.deleteSelectedItem(
             from: items,
@@ -48,16 +48,16 @@ final class HistoryDeletionTests: XCTestCase {
         let fetched = try context.fetch(FetchDescriptor<ClipItem>())
         XCTAssertEqual(result, .noSelection)
         XCTAssertEqual(fetched.count, 2)
-        XCTAssertEqual(state.itemIDs, ids)
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.historyItemIDs, ids)
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testDeleteSelectedItem_whenSelectionIsStaleDeletesNothingAndRepairsSelection() throws {
         let staleItem = try makeItems(count: 1)[0]
         let items = try makeItems(count: 2)
         let ids = items.map(\.persistentModelID)
-        state.itemIDs = [staleItem.persistentModelID] + ids
-        state.selectedID = staleItem.persistentModelID
+        state.replaceHistoryItems(with: [staleItem.persistentModelID] + ids)
+        state.selectedHistoryID = staleItem.persistentModelID
 
         let result = try HistoryDeletion.deleteSelectedItem(
             from: items,
@@ -68,15 +68,15 @@ final class HistoryDeletionTests: XCTestCase {
         let fetched = try context.fetch(FetchDescriptor<ClipItem>())
         XCTAssertEqual(result, .selectedItemMissing(staleItem.persistentModelID))
         XCTAssertEqual(fetched.count, 3)
-        XCTAssertEqual(state.itemIDs, ids)
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.historyItemIDs, ids)
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     func testDeleteSelectedItem_whenSaveFailsRollsBackAndKeepsSelection() throws {
         let items = try makeItems(count: 2)
         let ids = items.map(\.persistentModelID)
-        state.itemIDs = ids
-        state.selectedID = ids[0]
+        state.replaceHistoryItems(with: ids)
+        state.selectedHistoryID = ids[0]
 
         XCTAssertThrowsError(
             try HistoryDeletion.deleteSelectedItem(
@@ -89,8 +89,8 @@ final class HistoryDeletionTests: XCTestCase {
 
         let fetched = try context.fetch(FetchDescriptor<ClipItem>())
         XCTAssertEqual(fetched.count, 2)
-        XCTAssertEqual(state.itemIDs, ids)
-        XCTAssertEqual(state.selectedID, ids[0])
+        XCTAssertEqual(state.historyItemIDs, ids)
+        XCTAssertEqual(state.selectedHistoryID, ids[0])
     }
 
     private func makeItems(count: Int) throws -> [ClipItem] {

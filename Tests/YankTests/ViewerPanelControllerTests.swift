@@ -32,8 +32,8 @@ final class ViewerPanelControllerTests: XCTestCase {
         let staleID = fixture.items[2].persistentModelID
         let loadedIDs = [newestID, olderID]
         let state = ViewerState()
-        state.itemIDs = [staleID, olderID]
-        state.selectedID = olderID
+        state.replaceHistoryItems(with: [staleID, olderID])
+        state.selectedHistoryID = olderID
         var presentationCount = 0
 
         let controller = ViewerPanelController(
@@ -46,15 +46,15 @@ final class ViewerPanelControllerTests: XCTestCase {
             },
             presentPanel: { _ in
                 presentationCount += 1
-                XCTAssertEqual(state.itemIDs, loadedIDs)
-                XCTAssertEqual(state.selectedID, newestID)
+                XCTAssertEqual(state.historyItemIDs, loadedIDs)
+                XCTAssertEqual(state.selectedHistoryID, newestID)
             }
         )
 
         XCTAssertTrue(controller.show())
         XCTAssertEqual(presentationCount, 1)
-        XCTAssertEqual(state.itemIDs, loadedIDs)
-        XCTAssertEqual(state.selectedID, newestID)
+        XCTAssertEqual(state.historyItemIDs, loadedIDs)
+        XCTAssertEqual(state.selectedHistoryID, newestID)
     }
 
     func testShow_preservesSnippetsTabAndResetsHistorySelection() throws {
@@ -64,8 +64,8 @@ final class ViewerPanelControllerTests: XCTestCase {
         let loadedIDs = [newestID, olderID]
         let state = ViewerState()
         state.selectedTab = .snippets
-        state.itemIDs = loadedIDs
-        state.selectedID = olderID
+        state.replaceHistoryItems(with: loadedIDs)
+        state.selectedHistoryID = olderID
         var presentationCount = 0
 
         let controller = ViewerPanelController(
@@ -82,14 +82,14 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertTrue(controller.show())
         XCTAssertEqual(presentationCount, 1)
         XCTAssertEqual(state.selectedTab, .snippets)
-        XCTAssertEqual(state.selectedID, newestID)
+        XCTAssertEqual(state.selectedHistoryID, newestID)
     }
 
     func testShow_emptySnapshotClearsStateAndPresentsEmptyViewer() throws {
         let fixture = try makeItemFixture(count: 1)
         let state = ViewerState()
-        state.itemIDs = fixture.items.map(\.persistentModelID)
-        state.selectedID = state.itemIDs.first
+        state.replaceHistoryItems(with: fixture.items.map(\.persistentModelID))
+        state.selectedHistoryID = state.historyItemIDs.first
         var presentationCount = 0
 
         let controller = ViewerPanelController(
@@ -102,22 +102,22 @@ final class ViewerPanelControllerTests: XCTestCase {
             },
             presentPanel: { _ in
                 presentationCount += 1
-                XCTAssertTrue(state.itemIDs.isEmpty)
-                XCTAssertNil(state.selectedID)
+                XCTAssertTrue(state.historyItemIDs.isEmpty)
+                XCTAssertNil(state.selectedHistoryID)
             }
         )
 
         XCTAssertTrue(controller.show())
         XCTAssertEqual(presentationCount, 1)
-        XCTAssertTrue(state.itemIDs.isEmpty)
-        XCTAssertNil(state.selectedID)
+        XCTAssertTrue(state.historyItemIDs.isEmpty)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testShow_failureClearsStateBeforeReportingAndDoesNotPresent() throws {
         let fixture = try makeItemFixture(count: 1)
         let state = ViewerState()
-        state.itemIDs = fixture.items.map(\.persistentModelID)
-        state.selectedID = state.itemIDs.first
+        state.replaceHistoryItems(with: fixture.items.map(\.persistentModelID))
+        state.selectedHistoryID = state.historyItemIDs.first
         var reportCount = 0
         var presentationCount = 0
 
@@ -129,8 +129,8 @@ final class ViewerPanelControllerTests: XCTestCase {
             reportLoadFailure: { error in
                 reportCount += 1
                 XCTAssertTrue(error is TestFailure)
-                XCTAssertTrue(state.itemIDs.isEmpty)
-                XCTAssertNil(state.selectedID)
+                XCTAssertTrue(state.historyItemIDs.isEmpty)
+                XCTAssertNil(state.selectedHistoryID)
             },
             presentPanel: { _ in presentationCount += 1 }
         )
@@ -138,16 +138,16 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertFalse(controller.show())
         XCTAssertEqual(reportCount, 1)
         XCTAssertEqual(presentationCount, 0)
-        XCTAssertTrue(state.itemIDs.isEmpty)
-        XCTAssertNil(state.selectedID)
+        XCTAssertTrue(state.historyItemIDs.isEmpty)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testShow_failurePreservesSnippetsTabAndDoesNotPresent() throws {
         let fixture = try makeItemFixture(count: 1)
         let state = ViewerState()
         state.selectedTab = .snippets
-        state.itemIDs = fixture.items.map(\.persistentModelID)
-        state.selectedID = state.itemIDs.first
+        state.replaceHistoryItems(with: fixture.items.map(\.persistentModelID))
+        state.selectedHistoryID = state.historyItemIDs.first
         var reportCount = 0
         var presentationCount = 0
 
@@ -164,8 +164,8 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertEqual(reportCount, 1)
         XCTAssertEqual(presentationCount, 0)
         XCTAssertEqual(state.selectedTab, .snippets)
-        XCTAssertTrue(state.itemIDs.isEmpty)
-        XCTAssertNil(state.selectedID)
+        XCTAssertTrue(state.historyItemIDs.isEmpty)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testShow_failureAfterSuccessDoesNotPresentExistingPanelAgain() throws {
@@ -189,8 +189,8 @@ final class ViewerPanelControllerTests: XCTestCase {
             },
             reportLoadFailure: { _ in
                 reportCount += 1
-                XCTAssertTrue(state.itemIDs.isEmpty)
-                XCTAssertNil(state.selectedID)
+                XCTAssertTrue(state.historyItemIDs.isEmpty)
+                XCTAssertNil(state.selectedHistoryID)
             },
             presentPanel: { _ in presentationCount += 1 }
         )
@@ -202,8 +202,8 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertEqual(loadCount, 2)
         XCTAssertEqual(reportCount, 1)
         XCTAssertEqual(presentationCount, 1)
-        XCTAssertTrue(state.itemIDs.isEmpty)
-        XCTAssertNil(state.selectedID)
+        XCTAssertTrue(state.historyItemIDs.isEmpty)
+        XCTAssertNil(state.selectedHistoryID)
     }
 
     func testShow_synchronizesOneThousandItemsBeforePresentation() throws {
@@ -225,7 +225,7 @@ final class ViewerPanelControllerTests: XCTestCase {
                 XCTFail("Unexpected load failure: \(error)")
             },
             presentPanel: { _ in
-                itemIDsAtPresentation = state.itemIDs
+                itemIDsAtPresentation = state.historyItemIDs
             }
         )
 
@@ -233,8 +233,8 @@ final class ViewerPanelControllerTests: XCTestCase {
 
         let expectedIDs = items.reversed().map(\.persistentModelID)
         XCTAssertEqual(itemIDsAtPresentation, expectedIDs)
-        XCTAssertEqual(state.itemIDs, expectedIDs)
-        XCTAssertEqual(state.selectedID, expectedIDs.first)
+        XCTAssertEqual(state.historyItemIDs, expectedIDs)
+        XCTAssertEqual(state.selectedHistoryID, expectedIDs.first)
     }
 
     private struct ItemFixture {

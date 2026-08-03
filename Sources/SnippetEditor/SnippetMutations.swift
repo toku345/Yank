@@ -29,26 +29,6 @@ struct SnippetMutationResult: Equatable {
     let selectedSnippetID: PersistentIdentifier?
 }
 
-enum SnippetOrdering {
-    static func folders(_ folders: [SnippetFolder]) -> [SnippetFolder] {
-        folders.sorted {
-            if $0.sortOrder != $1.sortOrder {
-                return $0.sortOrder < $1.sortOrder
-            }
-            return $0.persistentModelID < $1.persistentModelID
-        }
-    }
-
-    static func snippets(_ snippets: [Snippet]) -> [Snippet] {
-        snippets.sorted {
-            if $0.sortOrder != $1.sortOrder {
-                return $0.sortOrder < $1.sortOrder
-            }
-            return $0.persistentModelID < $1.persistentModelID
-        }
-    }
-}
-
 @MainActor
 enum SnippetMutations {
     typealias SaveChanges = (ModelContext) throws -> Void

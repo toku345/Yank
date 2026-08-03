@@ -134,13 +134,13 @@ final class ViewerPanelController {
         do {
             itemIDs = try loadHistoryIDs()
         } catch {
-            viewerState.clearItems()
+            viewerState.clearHistoryItems()
             reportLoadFailure(error)
             return false
         }
 
-        viewerState.replaceItems(with: itemIDs)
-        viewerState.selectedID = itemIDs.first
+        viewerState.replaceHistoryItems(with: itemIDs)
+        viewerState.selectedHistoryID = itemIDs.first
         let panel = panelForPresentation()
         panel.resetTrackedModifiers()
         presentPanel(panel)
