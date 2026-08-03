@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR 0014](0014-macos-26-baseline.md)
 
 ## Context
 
