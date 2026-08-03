@@ -73,11 +73,12 @@ final class HistoryRowContractTests: XCTestCase {
     }
 
     private func makeFixture() throws -> Fixture {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(
-            for: ClipItem.self,
-            configurations: config
+        let schema = YankSchema.current
+        let config = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true
         )
+        let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
         let item = makeItem(title: "Target clip")
         let otherItem = makeItem(title: "Other clip")

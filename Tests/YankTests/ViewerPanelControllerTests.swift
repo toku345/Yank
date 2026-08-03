@@ -8,6 +8,24 @@ final class ViewerPanelControllerTests: XCTestCase {
         case loadFailed
     }
 
+    private var retainedControllers: [ViewerPanelController] = []
+    private var retainedPanels: [ViewerPanel] = []
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        try resetSharedContainer()
+    }
+
+    override func tearDown() {
+        for panel in retainedPanels {
+            panel.contentView = nil
+            panel.close()
+        }
+        retainedPanels.removeAll()
+        retainedControllers.removeAll()
+        super.tearDown()
+    }
+
     func testDefaultLoader_sortsSavedItemsNewestFirst() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -36,7 +54,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         state.selectedHistoryID = olderID
         var presentationCount = 0
 
-        let controller = ViewerPanelController(
+        let controller = retain(ViewerPanelController(
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
@@ -44,12 +62,13 @@ final class ViewerPanelControllerTests: XCTestCase {
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
             },
-            presentPanel: { _ in
+            presentPanel: { panel in
+                self.retain(panel)
                 presentationCount += 1
                 XCTAssertEqual(state.historyItemIDs, loadedIDs)
                 XCTAssertEqual(state.selectedHistoryID, newestID)
             }
-        )
+        ))
 
         XCTAssertTrue(controller.show())
         XCTAssertEqual(presentationCount, 1)
@@ -68,7 +87,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         state.selectedHistoryID = olderID
         var presentationCount = 0
 
-        let controller = ViewerPanelController(
+        let controller = retain(ViewerPanelController(
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
@@ -76,8 +95,11 @@ final class ViewerPanelControllerTests: XCTestCase {
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
             },
-            presentPanel: { _ in presentationCount += 1 }
-        )
+            presentPanel: { panel in
+                self.retain(panel)
+                presentationCount += 1
+            }
+        ))
 
         XCTAssertTrue(controller.show())
         XCTAssertEqual(presentationCount, 1)
@@ -92,7 +114,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         state.selectedHistoryID = state.historyItemIDs.first
         var presentationCount = 0
 
-        let controller = ViewerPanelController(
+        let controller = retain(ViewerPanelController(
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
@@ -100,12 +122,13 @@ final class ViewerPanelControllerTests: XCTestCase {
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
             },
-            presentPanel: { _ in
+            presentPanel: { panel in
+                self.retain(panel)
                 presentationCount += 1
                 XCTAssertTrue(state.historyItemIDs.isEmpty)
                 XCTAssertNil(state.selectedHistoryID)
             }
-        )
+        ))
 
         XCTAssertTrue(controller.show())
         XCTAssertEqual(presentationCount, 1)
@@ -121,7 +144,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         var reportCount = 0
         var presentationCount = 0
 
-        let controller = ViewerPanelController(
+        let controller = retain(ViewerPanelController(
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
@@ -133,7 +156,7 @@ final class ViewerPanelControllerTests: XCTestCase {
                 XCTAssertNil(state.selectedHistoryID)
             },
             presentPanel: { _ in presentationCount += 1 }
-        )
+        ))
 
         XCTAssertFalse(controller.show())
         XCTAssertEqual(reportCount, 1)
@@ -151,14 +174,14 @@ final class ViewerPanelControllerTests: XCTestCase {
         var reportCount = 0
         var presentationCount = 0
 
-        let controller = ViewerPanelController(
+        let controller = retain(ViewerPanelController(
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
             loadHistoryIDs: { throw TestFailure.loadFailed },
             reportLoadFailure: { _ in reportCount += 1 },
             presentPanel: { _ in presentationCount += 1 }
-        )
+        ))
 
         XCTAssertFalse(controller.show())
         XCTAssertEqual(reportCount, 1)
@@ -176,7 +199,7 @@ final class ViewerPanelControllerTests: XCTestCase {
         var reportCount = 0
         var presentationCount = 0
 
-        let controller = ViewerPanelController(
+        let controller = retain(ViewerPanelController(
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
@@ -192,8 +215,11 @@ final class ViewerPanelControllerTests: XCTestCase {
                 XCTAssertTrue(state.historyItemIDs.isEmpty)
                 XCTAssertNil(state.selectedHistoryID)
             },
-            presentPanel: { _ in presentationCount += 1 }
-        )
+            presentPanel: { panel in
+                self.retain(panel)
+                presentationCount += 1
+            }
+        ))
 
         XCTAssertTrue(controller.show())
         XCTAssertEqual(presentationCount, 1)
@@ -217,17 +243,18 @@ final class ViewerPanelControllerTests: XCTestCase {
 
         let state = ViewerState()
         var itemIDsAtPresentation: [PersistentIdentifier] = []
-        let controller = ViewerPanelController(
+        let controller = retain(ViewerPanelController(
             modelContainer: container,
             viewerState: state,
             onClearHistory: {},
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
             },
-            presentPanel: { _ in
+            presentPanel: { panel in
+                self.retain(panel)
                 itemIDsAtPresentation = state.historyItemIDs
             }
-        )
+        ))
 
         XCTAssertTrue(controller.show())
 
@@ -236,8 +263,19 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertEqual(state.historyItemIDs, expectedIDs)
         XCTAssertEqual(state.selectedHistoryID, expectedIDs.first)
     }
+}
 
-    private struct ItemFixture {
+private extension ViewerPanelControllerTests {
+    static let containerResult = Result<ModelContainer, Error> {
+        let schema = YankSchema.current
+        let config = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true
+        )
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    struct ItemFixture {
         let container: ModelContainer
         let items: [ClipItem]
     }
@@ -254,11 +292,24 @@ final class ViewerPanelControllerTests: XCTestCase {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        return try ModelContainer(
-            for: ClipItem.self,
-            configurations: config
-        )
+        try Self.containerResult.get()
+    }
+
+    func resetSharedContainer() throws {
+        let context = try Self.containerResult.get().mainContext
+        for item in try context.fetch(FetchDescriptor<ClipItem>()) {
+            context.delete(item)
+        }
+        try context.save()
+    }
+
+    private func retain(_ controller: ViewerPanelController) -> ViewerPanelController {
+        retainedControllers.append(controller)
+        return controller
+    }
+
+    func retain(_ panel: ViewerPanel) {
+        retainedPanels.append(panel)
     }
 
     private func makeItem(title: String, timestamp: TimeInterval) -> ClipItem {
