@@ -46,23 +46,20 @@ struct ViewerContentView: View {
         .onChange(of: clipItems.map(\.persistentModelID)) { _, newIDs in
             viewerState.replaceHistoryItems(with: newIDs)
         }
-        .onAppear {
-            synchronizeSnippetSelection(with: snippetCollectionSnapshot)
-        }
-        .onChange(of: snippetCollectionSnapshot) { _, snapshot in
-            synchronizeSnippetSelection(with: snapshot)
+        .task(id: selectableSnippetIDs) { [snippetIDs = selectableSnippetIDs] in
+            do {
+                try await Task.sleep(for: .milliseconds(16))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            viewerState.replaceSnippets(with: snippetIDs)
         }
     }
 
-    private var snippetCollectionSnapshot: [SnippetCollectionSnapshot] {
-        SnippetCollectionProjection.snapshots(from: snippetFolders)
-    }
-
-    private func synchronizeSnippetSelection(
-        with snapshot: [SnippetCollectionSnapshot]
-    ) {
-        viewerState.replaceSnippets(
-            with: SnippetCollectionProjection.selectableSnippetIDs(from: snapshot)
+    private var selectableSnippetIDs: [PersistentIdentifier] {
+        SnippetCollectionProjection.selectableSnippetIDs(
+            from: SnippetCollectionProjection.snapshots(from: snippetFolders)
         )
     }
 
