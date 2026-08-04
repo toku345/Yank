@@ -12,7 +12,7 @@
 
 ## Project Overview
 
-Yank は macOS 15+ 向けのクリップボードマネージャです。
+Yank は macOS 26+ 向けのクリップボードマネージャです。
 Clipy の後継を意識し、SwiftUI + SwiftData + Carbon API を中心に、外部ランタイム依存なしで構築します。
 
 プロダクトの各 Phase と完了条件は `PLAN.md` に記録します。公開向けの短い現在状況は `README.md` の Project Status、実作業の状態は GitHub Issues と Milestones を参照してください。
@@ -46,7 +46,7 @@ Clipy の後継を意識し、SwiftUI + SwiftData + Carbon API を中心に、�
 - Paste execution: CGEvent による Cmd+V シミュレーション
 - Clipboard monitoring: `Timer` + `NSPasteboard.changeCount` の 250ms ポーリング
 - Project generation: XcodeGen (`project.yml` -> `.xcodeproj`)
-- Deployment target: macOS 15 Sequoia (ADR 0011)
+- Deployment target: macOS 26 Tahoe (ADR 0014)
 - Package policy: 外部依存ゼロを基本方針とする
 
 Carbon API での実装が現実的でない場合のみ HotKey などの SPM 依存を検討します。
@@ -83,7 +83,7 @@ swiftlint lint --strict
 log stream --predicate 'subsystem == "com.toku345.Yank"' --level debug
 ```
 
-CI は GitHub Actions の `macos-15` ランナーで、Markdown のみの変更を除く PR と `main` push 時にビルド・テストを実行します。
+CI は GitHub Actions の `macos-26` ランナーで、Markdown のみの変更を除く PR と `main` push 時にビルド・テストを実行します。
 ワークフローは `.github/workflows/ci.yml` です。
 
 CI 関連の注意:

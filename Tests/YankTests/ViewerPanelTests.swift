@@ -6,6 +6,12 @@ import XCTest
 @MainActor
 final class ViewerPanelTests: XCTestCase {
     private static let currentUptime: TimeInterval = 10
+    private var retainedModelContainer: ModelContainer?
+
+    override func tearDown() {
+        retainedModelContainer = nil
+        super.tearDown()
+    }
 
     func testSendEvent_staleRepeatedMoveIsDiscarded() throws {
         let (state, _) = try makeStateWithOneItem()
@@ -144,11 +150,13 @@ final class ViewerPanelTests: XCTestCase {
         state: ViewerState,
         itemID: PersistentIdentifier
     ) {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(
-            for: ClipItem.self,
-            configurations: config
+        let schema = YankSchema.current
+        let config = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true
         )
+        let container = try ModelContainer(for: schema, configurations: [config])
+        retainedModelContainer = container
         let context = ModelContext(container)
         let item = ClipItem(
             title: "Item",
