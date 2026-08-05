@@ -48,6 +48,7 @@ final class AppCoordinator {
             }
         )
         controller.onPaste = { [weak self] item, format in self?.handlePaste(item, format: format) }
+        controller.onSnippetPaste = { [weak self] snippet in self?.handleSnippetPaste(snippet) }
         controller.onClose = { [weak self] in self?.panelController?.close() }
         panelController = controller
 
@@ -107,9 +108,15 @@ final class AppCoordinator {
         case .plainText:
             success = PasteService.writePlainTextToPasteboard(item: item)
         }
+        completePasteWrite(success)
+    }
+
+    private func handleSnippetPaste(_ snippet: Snippet) {
+        completePasteWrite(PasteService.writeSnippetToPasteboard(snippet: snippet))
+    }
+
+    private func completePasteWrite(_ success: Bool) {
         guard success else {
-            // Plain-text paste can fail when the item has no text representation
-            // (e.g. image-only clips). Beep to signal the action didn't take.
             NSSound.beep()
             logger.error("Failed to write to pasteboard — aborting paste")
             return

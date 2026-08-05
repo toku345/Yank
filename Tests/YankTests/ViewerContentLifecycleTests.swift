@@ -49,11 +49,13 @@ private final class ViewerSnippetLifecycleRecorder {
 private struct ViewerSnippetLifecycleProbe: View {
     @Bindable var viewerState: ViewerState
     let recorder: ViewerSnippetLifecycleRecorder
+    var onSnippetPaste: (Snippet) -> Void = { _ in }
 
     var body: some View {
         ViewerContentView(
             viewerState: viewerState,
             onPaste: { _, _ in },
+            onSnippetPaste: onSnippetPaste,
             onClose: {},
             onClearHistory: {}
         )
@@ -133,6 +135,29 @@ final class ViewerContentLifecycleTests: XCTestCase {
             recorder: fixture.recorder,
             description: "mounted viewer synchronized deleted snippet"
         )
+    }
+
+    func testMountedViewDispatchesSelectedSnippetPaste() async throws {
+        let pasteExpectation = expectation(description: "selected snippet pasted")
+        var pastedID: PersistentIdentifier?
+        let fixture = try makeFixture { snippet in
+            pastedID = snippet.persistentModelID
+            pasteExpectation.fulfill()
+        }
+        defer { fixture.window.contentView = nil }
+
+        await waitForSnippetState(
+            [fixture.firstID, fixture.secondID],
+            selectedSnippetID: fixture.firstID,
+            recorder: fixture.recorder,
+            description: "mounted viewer synchronized snippets before paste"
+        )
+
+        fixture.state.selectedTab = .snippets
+        fixture.state.perform(.paste(.original))
+
+        await fulfillment(of: [pasteExpectation], timeout: 1.0)
+        XCTAssertEqual(pastedID, fixture.firstID)
     }
 
     func testMountedViewSynchronizesSelectedSnippetMovedAcrossFolders() async throws {
@@ -244,7 +269,9 @@ final class ViewerContentLifecycleTests: XCTestCase {
         )
     }
 
-    private func makeFixture() throws -> Fixture {
+    private func makeFixture(
+        onSnippetPaste: @escaping (Snippet) -> Void = { _ in }
+    ) throws -> Fixture {
         let container = try makeContainer()
         let context = container.mainContext
         let folder = SnippetFolder(title: "Folder", sortOrder: 0)
@@ -258,7 +285,8 @@ final class ViewerContentLifecycleTests: XCTestCase {
         let recorder = ViewerSnippetLifecycleRecorder()
         let rootView = ViewerSnippetLifecycleProbe(
             viewerState: state,
-            recorder: recorder
+            recorder: recorder,
+            onSnippetPaste: onSnippetPaste
         )
         .modelContainer(container)
 

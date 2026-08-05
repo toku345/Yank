@@ -100,6 +100,7 @@ final class ViewerPanelController {
     private let presentPanel: PanelPresenter
 
     var onPaste: ((ClipItem, PasteFormat) -> Void)?
+    var onSnippetPaste: ((Snippet) -> Void)?
     var onClose: (() -> Void)?
 
     init(
@@ -161,6 +162,7 @@ final class ViewerPanelController {
         let contentView = ViewerContentView(
             viewerState: viewerState,
             onPaste: { [weak self] item, format in self?.onPaste?(item, format) },
+            onSnippetPaste: { [weak self] snippet in self?.onSnippetPaste?(snippet) },
             onClose: { [weak self] in self?.onClose?() },
             onClearHistory: { [weak self] in
                 guard let self else { return }

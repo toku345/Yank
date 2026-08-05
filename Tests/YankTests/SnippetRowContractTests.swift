@@ -61,6 +61,25 @@ final class SnippetRowContractTests: XCTestCase {
         )
     }
 
+    func testSelectionResolverReturnsOnlySnippetInVisibleFolders() throws {
+        let fixture = try makeFixture()
+
+        XCTAssertTrue(
+            ViewerSnippetSelection.resolve(
+                selectedID: fixture.snippet.persistentModelID,
+                in: [fixture.folder]
+            ) === fixture.snippet
+        )
+        XCTAssertNil(ViewerSnippetSelection.resolve(
+            selectedID: fixture.otherSnippet.persistentModelID,
+            in: [fixture.folder]
+        ))
+        XCTAssertNil(ViewerSnippetSelection.resolve(
+            selectedID: nil,
+            in: [fixture.folder]
+        ))
+    }
+
     private struct Fixture {
         let container: ModelContainer
         let folder: SnippetFolder

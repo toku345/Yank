@@ -21,6 +21,7 @@ struct ViewerContentView: View {
     @State private var isClearingHistory = false
 
     let onPaste: (ClipItem, PasteFormat) -> Void
+    let onSnippetPaste: (Snippet) -> Void
     let onClose: () -> Void
     let onClearHistory: @MainActor () async throws -> Void
 
@@ -71,7 +72,7 @@ struct ViewerContentView: View {
             SnippetListView(
                 folders: snippetFolders,
                 viewerState: viewerState,
-                onSnippetTap: nil
+                onSnippetTap: onSnippetPaste
             )
         }
     }
@@ -131,8 +132,17 @@ struct ViewerContentView: View {
             action: action,
             selectedTab: viewerState.selectedTab,
             onClose: onClose,
-            onHistoryAction: handleHistoryAction
+            onHistoryAction: handleHistoryAction,
+            onSnippetPaste: handleSnippetPaste
         )
+    }
+
+    private func handleSnippetPaste() {
+        guard let snippet = ViewerSnippetSelection.resolve(
+            selectedID: viewerState.selectedSnippetID,
+            in: snippetFolders
+        ) else { return }
+        onSnippetPaste(snippet)
     }
 
     private func handleHistoryAction(_ action: ViewerAction) {
@@ -222,20 +232,40 @@ enum ViewerContentActionRouting {
         action: ViewerAction,
         selectedTab: ViewerTab,
         onClose: () -> Void,
-        onHistoryAction: (ViewerAction) -> Void
+        onHistoryAction: (ViewerAction) -> Void,
+        onSnippetPaste: () -> Void
     ) {
-        if action == .close {
-            onClose()
-            return
-        }
-        guard selectedTab == .history else { return }
+        guard action.isAvailable(in: selectedTab) else { return }
 
         switch action {
-        case .paste, .deleteSelected, .clearHistory:
+        case .close:
+            onClose()
+        case .paste:
+            switch selectedTab {
+            case .history:
+                onHistoryAction(action)
+            case .snippets:
+                onSnippetPaste()
+            }
+        case .deleteSelected, .clearHistory:
             onHistoryAction(action)
-        case .move, .jumpToStart, .jumpToEnd, .switchTab, .close:
+        case .move, .jumpToStart, .jumpToEnd, .switchTab:
             break
         }
+    }
+}
+
+@MainActor
+enum ViewerSnippetSelection {
+    static func resolve(
+        selectedID: PersistentIdentifier?,
+        in folders: [SnippetFolder]
+    ) -> Snippet? {
+        guard let selectedID else { return nil }
+        return SnippetOrdering.folders(folders)
+            .lazy
+            .flatMap { SnippetOrdering.snippets($0.snippets) }
+            .first { $0.persistentModelID == selectedID }
     }
 }
 

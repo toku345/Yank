@@ -12,6 +12,12 @@ enum ViewerTab: Hashable {
 }
 
 enum ViewerAction: Equatable {
+    enum Scope {
+        case global
+        case activeTab
+        case historyOnly
+    }
+
     enum Direction {
         case up, down
     }
@@ -28,6 +34,26 @@ enum ViewerAction: Equatable {
     case deleteSelected
     case clearHistory
     case close
+
+    var scope: Scope {
+        switch self {
+        case .switchTab, .close:
+            .global
+        case .move, .jumpToStart, .jumpToEnd, .paste:
+            .activeTab
+        case .deleteSelected, .clearHistory:
+            .historyOnly
+        }
+    }
+
+    func isAvailable(in tab: ViewerTab) -> Bool {
+        switch scope {
+        case .global, .activeTab:
+            true
+        case .historyOnly:
+            tab == .history
+        }
+    }
 }
 
 enum ViewerActionDispatchPolicy {
@@ -61,6 +87,7 @@ final class ViewerState {
     private(set) var snippetIDs: [PersistentIdentifier] = []
 
     func perform(_ action: ViewerAction) {
+        guard action.isAvailable(in: selectedTab) else { return }
         switch action {
         case .switchTab(let direction):
             switchTab(direction)
@@ -73,7 +100,6 @@ final class ViewerState {
         case .jumpToEnd:
             jumpActiveSelection(to: .end)
         case .paste, .deleteSelected, .clearHistory:
-            guard selectedTab == .history else { return }
             pendingAction = action
         }
     }
