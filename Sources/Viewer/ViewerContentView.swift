@@ -30,11 +30,7 @@ struct ViewerContentView: View {
                 historyContent
             }
             Tab("Snippets", systemImage: "text.quote", value: ViewerTab.snippets) {
-                ContentUnavailableView(
-                    "Snippets",
-                    systemImage: "text.quote",
-                    description: Text("Snippet browsing is coming in a future update.")
-                )
+                snippetContent
             }
         }
         .frame(minWidth: 350, idealWidth: 400, minHeight: 300, idealHeight: 500)
@@ -61,6 +57,23 @@ struct ViewerContentView: View {
         SnippetCollectionProjection.selectableSnippetIDs(
             from: SnippetCollectionProjection.snapshots(from: snippetFolders)
         )
+    }
+
+    @ViewBuilder
+    private var snippetContent: some View {
+        if snippetFolders.isEmpty {
+            ContentUnavailableView(
+                "No Snippets",
+                systemImage: "text.quote",
+                description: Text("Create a snippet in Manage Snippets to see it here")
+            )
+        } else {
+            SnippetListView(
+                folders: snippetFolders,
+                viewerState: viewerState,
+                onSnippetTap: nil
+            )
+        }
     }
 
     private var historyContent: some View {
