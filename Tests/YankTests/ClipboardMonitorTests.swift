@@ -146,6 +146,36 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertNil(selfPasted, "Self-pasted content should not be captured")
     }
 
+    func testIgnoresSnippetPasteWrittenByPasteService() async throws {
+        let schema = YankSchema.current
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+        let folder = SnippetFolder(title: "Folder", sortOrder: 0)
+        let snippet = Snippet(
+            title: "Snippet",
+            content: "self-pasted snippet",
+            sortOrder: 0,
+            folder: folder
+        )
+        context.insert(folder)
+        context.insert(snippet)
+        try context.save()
+
+        let pasteboard = makeTestPasteboard()
+        let monitor = ClipboardMonitor(modelContainer: container, pasteboard: pasteboard)
+
+        XCTAssertTrue(PasteService.writeSnippetToPasteboard(
+            snippet: snippet,
+            pasteboard: pasteboard
+        ))
+        monitor.pollClipboard()
+        await monitor.stopAndDrain()
+
+        let items = try ModelContext(container).fetch(FetchDescriptor<ClipItem>())
+        XCTAssertTrue(items.isEmpty)
+    }
+
     func testIgnoresCaptureSkipMarkers() throws {
         let expectedMarkerRawValues = [
             "org.nspasteboard.ConcealedType",

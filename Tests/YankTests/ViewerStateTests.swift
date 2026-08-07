@@ -69,14 +69,21 @@ final class ViewerStateTests: XCTestCase {
         XCTAssertEqual(state.selectedTab, .history)
     }
 
-    func testHistoryViewActions_areIgnoredInSnippets() {
+    func testHistoryOnlyViewActions_areIgnoredInSnippets() {
         state.selectedTab = .snippets
 
-        state.perform(.paste(.original))
         state.perform(.deleteSelected)
         state.perform(.clearHistory)
 
         XCTAssertNil(state.pendingAction)
+    }
+
+    func testPaste_isAvailableInSnippets() {
+        state.selectedTab = .snippets
+
+        state.perform(.paste(.original))
+
+        XCTAssertEqual(state.pendingAction, .paste(.original))
     }
 
     func testClose_isAvailableInSnippets() {

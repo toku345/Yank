@@ -143,4 +143,58 @@ final class PasteServiceTests: XCTestCase {
         XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Hello RTF"))
         XCTAssertNil(pasteboard.data(forType: .rtf))
     }
+
+    func testWriteSnippet_writesPlainTextAndSelfPasteMarkerOnly() throws {
+        let schema = YankSchema.current
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+        let pasteboard = makeTestPasteboard()
+        let folder = SnippetFolder(title: "Folder", sortOrder: 0)
+        let snippet = Snippet(
+            title: "Greeting",
+            content: "Hello from a snippet!",
+            sortOrder: 0,
+            folder: folder
+        )
+        context.insert(folder)
+        context.insert(snippet)
+        try context.save()
+
+        let result = PasteService.writeSnippetToPasteboard(
+            snippet: snippet,
+            pasteboard: pasteboard
+        )
+
+        XCTAssertTrue(result)
+        XCTAssertEqual(pasteboard.string(forType: .string), "Hello from a snippet!")
+        XCTAssertEqual(pasteboard.string(forType: .fromYank), "")
+        XCTAssertNil(pasteboard.data(forType: .html))
+        XCTAssertNil(pasteboard.data(forType: .rtf))
+    }
+
+    func testWriteSnippet_withEmptyContentWritesEmptyPlainText() throws {
+        let schema = YankSchema.current
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+        let pasteboard = makeTestPasteboard()
+        let folder = SnippetFolder(title: "Folder", sortOrder: 0)
+        let snippet = Snippet(
+            title: "Empty",
+            content: "",
+            sortOrder: 0,
+            folder: folder
+        )
+        context.insert(folder)
+        context.insert(snippet)
+        try context.save()
+
+        XCTAssertTrue(PasteService.writeSnippetToPasteboard(
+            snippet: snippet,
+            pasteboard: pasteboard
+        ))
+        XCTAssertEqual(pasteboard.string(forType: .string), "")
+        XCTAssertEqual(pasteboard.string(forType: .fromYank), "")
+    }
 }

@@ -48,16 +48,40 @@ enum PasteService {
             return false
         }
 
+        return writePlainText(
+            textValue,
+            sourceTitle: item.title,
+            pasteboard: pasteboard
+        )
+    }
+
+    @discardableResult
+    static func writeSnippetToPasteboard(
+        snippet: Snippet,
+        pasteboard: NSPasteboard = .general
+    ) -> Bool {
+        writePlainText(
+            snippet.content,
+            sourceTitle: snippet.title,
+            pasteboard: pasteboard
+        )
+    }
+
+    private static func writePlainText(
+        _ text: String,
+        sourceTitle: String,
+        pasteboard: NSPasteboard
+    ) -> Bool {
         let pbItem = NSPasteboardItem()
-        pbItem.setString(textValue, forType: .string)
+        pbItem.setString(text, forType: .string)
         // Self-paste suppression marker (ADR 0002)
         pbItem.setString("", forType: .fromYank)
 
         guard writePreservingOnFailure([pbItem], to: pasteboard) else {
-            logger.error("writePlainTextToPasteboard failed; restored snapshot for: \(item.title, privacy: .private)")
+            logger.error("Plain-text pasteboard write failed; restored snapshot for: \(sourceTitle, privacy: .private)")
             return false
         }
-        logger.debug("Wrote plain text to pasteboard: \(item.title, privacy: .private)")
+        logger.debug("Wrote plain text to pasteboard: \(sourceTitle, privacy: .private)")
         return true
     }
 

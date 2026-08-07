@@ -37,7 +37,7 @@ targets:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         NSAccessibilityUsageDescription: >-
           Yank needs Accessibility access to simulate paste (Cmd+V)
-          after selecting a clipboard history item.
+          after selecting a clipboard history item or snippet.
         NSHumanReadableCopyright: "Copyright © 2026 toku345. All rights reserved."
         UTExportedTypeDeclarations:
           - UTTypeConformsTo:
