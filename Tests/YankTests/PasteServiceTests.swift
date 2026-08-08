@@ -3,6 +3,31 @@ import AppKit
 import SwiftData
 @testable import Yank
 
+private final class FailingPasteboardItem: NSPasteboardItem {
+    private let failingType: NSPasteboard.PasteboardType
+
+    init(failingType: NSPasteboard.PasteboardType) {
+        self.failingType = failingType
+        super.init()
+    }
+
+    required init?(
+        pasteboardPropertyList propertyList: Any,
+        ofType type: NSPasteboard.PasteboardType
+    ) {
+        failingType = type
+        super.init(pasteboardPropertyList: propertyList, ofType: type)
+    }
+
+    override func setString(
+        _ string: String,
+        forType dataType: NSPasteboard.PasteboardType
+    ) -> Bool {
+        guard dataType != failingType else { return false }
+        return super.setString(string, forType: dataType)
+    }
+}
+
 final class PasteServiceTests: XCTestCase {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -50,6 +75,27 @@ final class PasteServiceTests: XCTestCase {
         XCTAssertEqual(pasteboard.string(forType: .string), "Hello, world!")
         // HTML type must not be present
         XCTAssertNil(pasteboard.data(forType: .html))
+    }
+
+    func testWritePlainText_whenStringRegistrationFails_preservesPasteboard() {
+        let pasteboard = makeTestPasteboard()
+        seedSentinel(in: pasteboard)
+        let item = ClipItem(
+            title: "Plain",
+            primaryType: "public.utf8-plain-text",
+            availableTypes: ["public.utf8-plain-text"],
+            stringValue: "replacement"
+        )
+
+        let result = PasteService.writePlainTextToPasteboard(
+            item: item,
+            pasteboard: pasteboard,
+            makePasteboardItem: { FailingPasteboardItem(failingType: .string) }
+        )
+
+        XCTAssertFalse(result)
+        XCTAssertEqual(pasteboard.string(forType: .string), "sentinel")
+        XCTAssertNil(pasteboard.string(forType: .fromYank))
     }
 
     func testWritePlainText_withFileURLsOnly_writesPathString() throws {
@@ -196,5 +242,33 @@ final class PasteServiceTests: XCTestCase {
         ))
         XCTAssertEqual(pasteboard.string(forType: .string), "")
         XCTAssertEqual(pasteboard.string(forType: .fromYank), "")
+    }
+
+    func testWriteSnippet_whenSelfPasteMarkerRegistrationFails_preservesPasteboard() {
+        let pasteboard = makeTestPasteboard()
+        seedSentinel(in: pasteboard)
+        let folder = SnippetFolder(title: "Folder", sortOrder: 0)
+        let snippet = Snippet(
+            title: "Greeting",
+            content: "replacement",
+            sortOrder: 0,
+            folder: folder
+        )
+
+        let result = PasteService.writeSnippetToPasteboard(
+            snippet: snippet,
+            pasteboard: pasteboard,
+            makePasteboardItem: { FailingPasteboardItem(failingType: .fromYank) }
+        )
+
+        XCTAssertFalse(result)
+        XCTAssertEqual(pasteboard.string(forType: .string), "sentinel")
+        XCTAssertNil(pasteboard.string(forType: .fromYank))
+    }
+
+    private func seedSentinel(in pasteboard: NSPasteboard) {
+        let item = NSPasteboardItem()
+        XCTAssertTrue(item.setString("sentinel", forType: .string))
+        XCTAssertTrue(pasteboard.writeObjects([item]))
     }
 }

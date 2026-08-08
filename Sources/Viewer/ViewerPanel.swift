@@ -98,15 +98,16 @@ final class ViewerPanelController {
     private let loadHistoryIDs: HistoryIDLoader
     private let reportLoadFailure: LoadFailureReporter
     private let presentPanel: PanelPresenter
+    private let onSnippetPaste: (Snippet) -> Void
 
     var onPaste: ((ClipItem, PasteFormat) -> Void)?
-    var onSnippetPaste: ((Snippet) -> Void)?
     var onClose: (() -> Void)?
 
     init(
         modelContainer: ModelContainer,
         viewerState: ViewerState,
         onClearHistory: @escaping @MainActor () async throws -> Void,
+        onSnippetPaste: @escaping (Snippet) -> Void,
         loadHistoryIDs: HistoryIDLoader? = nil,
         reportLoadFailure: LoadFailureReporter? = nil,
         presentPanel: PanelPresenter? = nil
@@ -114,6 +115,7 @@ final class ViewerPanelController {
         self.modelContainer = modelContainer
         self.viewerState = viewerState
         self.clearHistory = onClearHistory
+        self.onSnippetPaste = onSnippetPaste
         self.loadHistoryIDs = loadHistoryIDs ?? Self.makeHistoryIDLoader(
             modelContainer: modelContainer
         )
@@ -162,7 +164,7 @@ final class ViewerPanelController {
         let contentView = ViewerContentView(
             viewerState: viewerState,
             onPaste: { [weak self] item, format in self?.onPaste?(item, format) },
-            onSnippetPaste: { [weak self] snippet in self?.onSnippetPaste?(snippet) },
+            onSnippetPaste: { [weak self] snippet in self?.onSnippetPaste(snippet) },
             onClose: { [weak self] in self?.onClose?() },
             onClearHistory: { [weak self] in
                 guard let self else { return }

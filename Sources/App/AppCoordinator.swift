@@ -45,10 +45,12 @@ final class AppCoordinator {
             onClearHistory: { [weak self] in
                 guard let self else { return }
                 try await self.clearHistory()
+            },
+            onSnippetPaste: { [weak self] snippet in
+                self?.handleSnippetPaste(snippet)
             }
         )
         controller.onPaste = { [weak self] item, format in self?.handlePaste(item, format: format) }
-        controller.onSnippetPaste = { [weak self] snippet in self?.handleSnippetPaste(snippet) }
         controller.onClose = { [weak self] in self?.panelController?.close() }
         panelController = controller
 
