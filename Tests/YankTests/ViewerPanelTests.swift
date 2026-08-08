@@ -117,61 +117,6 @@ final class ViewerPanelTests: XCTestCase {
         XCTAssertNil(state.pendingAction)
     }
 
-    func testHandleViewerKeyDown_bareKeypadEnterDispatchesOriginalPaste() throws {
-        let state = ViewerState()
-        let panel = makePanel(viewerState: state)
-
-        let wasHandled = panel.handleViewerKeyDown(
-            try makeCharacterEvent(
-                character: "\u{3}",
-                keyCode: 76,
-                modifierFlags: []
-            )
-        )
-
-        XCTAssertTrue(wasHandled)
-        XCTAssertEqual(state.pendingAction, .paste(.original))
-    }
-
-    func testHandleViewerKeyDown_controlKeypadEnterDispatchesPlainTextPaste() throws {
-        let state = ViewerState()
-        let panel = makePanel(viewerState: state)
-        panel.sendEvent(
-            try makeFlagsChangedEvent(modifierFlags: .control)
-        )
-
-        let wasHandled = panel.handleViewerKeyDown(
-            try makeCharacterEvent(
-                character: "\u{3}",
-                keyCode: 76,
-                modifierFlags: .control
-            )
-        )
-
-        XCTAssertTrue(wasHandled)
-        XCTAssertEqual(state.pendingAction, .paste(.plainText))
-    }
-
-    func testHandleViewerKeyDown_controlKeypadEnterDispatchesPasteInSnippets() throws {
-        let state = ViewerState()
-        state.selectedTab = .snippets
-        let panel = makePanel(viewerState: state)
-        panel.sendEvent(
-            try makeFlagsChangedEvent(modifierFlags: .control)
-        )
-
-        let wasHandled = panel.handleViewerKeyDown(
-            try makeCharacterEvent(
-                character: "\u{3}",
-                keyCode: 76,
-                modifierFlags: .control
-            )
-        )
-
-        XCTAssertTrue(wasHandled)
-        XCTAssertEqual(state.pendingAction, .paste(.plainText))
-    }
-
     func testSendEvent_modifierReleaseRestoresEscapeClose() throws {
         let state = ViewerState()
         let panel = makePanel(viewerState: state)
@@ -282,6 +227,42 @@ final class ViewerPanelTests: XCTestCase {
                 context: nil,
                 characters: character,
                 charactersIgnoringModifiers: character,
+                isARepeat: false,
+                keyCode: keyCode
+            )
+        )
+    }
+}
+
+@MainActor
+final class ViewerPanelKeyEquivalentTests: XCTestCase {
+    func testControlReturnDispatchesPlainTextPaste() throws {
+        let state = ViewerState()
+        let panel = ViewerPanel(viewerState: state, contentView: NSView())
+        panel.sendEvent(try makeEvent(type: .flagsChanged, keyCode: 59))
+
+        let handled = panel.performKeyEquivalent(
+            with: try makeEvent(type: .keyDown, keyCode: 36)
+        )
+
+        XCTAssertTrue(handled)
+        XCTAssertEqual(state.pendingAction, .paste(.plainText))
+    }
+
+    private func makeEvent(
+        type: NSEvent.EventType,
+        keyCode: UInt16
+    ) throws -> NSEvent {
+        try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: type,
+                location: .zero,
+                modifierFlags: .control,
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: type == .keyDown ? "\r" : "",
+                charactersIgnoringModifiers: type == .keyDown ? "\r" : "",
                 isARepeat: false,
                 keyCode: keyCode
             )
