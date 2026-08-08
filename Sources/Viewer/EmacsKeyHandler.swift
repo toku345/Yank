@@ -41,7 +41,7 @@ enum EmacsKeyHandler {
             )
         }
         // Ctrl+Return → plain text, bare Return → original format.
-        if event.keyCode == 36 {
+        if isReturnKey(event.keyCode) {
             let action: ViewerAction = trackedModifiers.contains(.control)
                 ? .paste(.plainText) : .paste(.original)
             return .action(action)
@@ -50,6 +50,10 @@ enum EmacsKeyHandler {
             return result(for: handleControl(event: event))
         }
         return result(for: handlePlain(event: event))
+    }
+
+    private static func isReturnKey(_ keyCode: UInt16) -> Bool {
+        keyCode == 36 || keyCode == 76 // Main Return or keypad Enter
     }
 
     static func action(

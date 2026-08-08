@@ -117,6 +117,61 @@ final class ViewerPanelTests: XCTestCase {
         XCTAssertNil(state.pendingAction)
     }
 
+    func testHandleViewerKeyDown_bareKeypadEnterDispatchesOriginalPaste() throws {
+        let state = ViewerState()
+        let panel = makePanel(viewerState: state)
+
+        let wasHandled = panel.handleViewerKeyDown(
+            try makeCharacterEvent(
+                character: "\u{3}",
+                keyCode: 76,
+                modifierFlags: []
+            )
+        )
+
+        XCTAssertTrue(wasHandled)
+        XCTAssertEqual(state.pendingAction, .paste(.original))
+    }
+
+    func testHandleViewerKeyDown_controlKeypadEnterDispatchesPlainTextPaste() throws {
+        let state = ViewerState()
+        let panel = makePanel(viewerState: state)
+        panel.sendEvent(
+            try makeFlagsChangedEvent(modifierFlags: .control)
+        )
+
+        let wasHandled = panel.handleViewerKeyDown(
+            try makeCharacterEvent(
+                character: "\u{3}",
+                keyCode: 76,
+                modifierFlags: .control
+            )
+        )
+
+        XCTAssertTrue(wasHandled)
+        XCTAssertEqual(state.pendingAction, .paste(.plainText))
+    }
+
+    func testHandleViewerKeyDown_controlKeypadEnterDispatchesPasteInSnippets() throws {
+        let state = ViewerState()
+        state.selectedTab = .snippets
+        let panel = makePanel(viewerState: state)
+        panel.sendEvent(
+            try makeFlagsChangedEvent(modifierFlags: .control)
+        )
+
+        let wasHandled = panel.handleViewerKeyDown(
+            try makeCharacterEvent(
+                character: "\u{3}",
+                keyCode: 76,
+                modifierFlags: .control
+            )
+        )
+
+        XCTAssertTrue(wasHandled)
+        XCTAssertEqual(state.pendingAction, .paste(.plainText))
+    }
+
     func testSendEvent_modifierReleaseRestoresEscapeClose() throws {
         let state = ViewerState()
         let panel = makePanel(viewerState: state)

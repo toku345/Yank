@@ -66,10 +66,26 @@ final class EmacsKeyHandlerTests: XCTestCase {
         )
     }
 
+    func testKeypadEnter_withStaleEventControlFlag_pastesOriginal() {
+        let event = makeKeyEvent(keyCode: 76, modifierFlags: .control)
+        XCTAssertEqual(
+            EmacsKeyHandler.action(event: event, trackedModifiers: []),
+            .paste(.original)
+        )
+    }
+
     // Return + trackedModifiers=.control and event.modifierFlags=[] →
     // must resolve to .paste(.plainText). Proves tracked state is sufficient.
     func testReturn_withTrackedControlOnly_pastesPlainText() {
         let event = makeKeyEvent(keyCode: 36)
+        XCTAssertEqual(
+            EmacsKeyHandler.action(event: event, trackedModifiers: .control),
+            .paste(.plainText)
+        )
+    }
+
+    func testKeypadEnter_withTrackedControlOnly_pastesPlainText() {
+        let event = makeKeyEvent(keyCode: 76)
         XCTAssertEqual(
             EmacsKeyHandler.action(event: event, trackedModifiers: .control),
             .paste(.plainText)
@@ -98,8 +114,21 @@ final class EmacsKeyHandlerTests: XCTestCase {
         XCTAssertEqual(EmacsKeyHandler.action(event: event), .paste(.original))
     }
 
+    func testKeypadEnter_pastesOriginal() {
+        let event = makeKeyEvent(keyCode: 76)
+        XCTAssertEqual(EmacsKeyHandler.action(event: event), .paste(.original))
+    }
+
     func testControlReturn_pastesPlainText() {
         let event = makeKeyEvent(keyCode: 36, modifierFlags: .control)
+        XCTAssertEqual(
+            EmacsKeyHandler.action(event: event, trackedModifiers: .control),
+            .paste(.plainText)
+        )
+    }
+
+    func testControlKeypadEnter_pastesPlainText() {
+        let event = makeKeyEvent(keyCode: 76, modifierFlags: .control)
         XCTAssertEqual(
             EmacsKeyHandler.action(event: event, trackedModifiers: .control),
             .paste(.plainText)
