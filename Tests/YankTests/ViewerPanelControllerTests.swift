@@ -58,6 +58,7 @@ final class ViewerPanelControllerTests: XCTestCase {
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
+            onSnippetPaste: { _ in },
             loadHistoryIDs: { loadedIDs },
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
@@ -91,6 +92,7 @@ final class ViewerPanelControllerTests: XCTestCase {
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
+            onSnippetPaste: { _ in },
             loadHistoryIDs: { loadedIDs },
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
@@ -118,6 +120,7 @@ final class ViewerPanelControllerTests: XCTestCase {
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
+            onSnippetPaste: { _ in },
             loadHistoryIDs: { [] },
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
@@ -148,6 +151,7 @@ final class ViewerPanelControllerTests: XCTestCase {
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
+            onSnippetPaste: { _ in },
             loadHistoryIDs: { throw TestFailure.loadFailed },
             reportLoadFailure: { error in
                 reportCount += 1
@@ -178,6 +182,7 @@ final class ViewerPanelControllerTests: XCTestCase {
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
+            onSnippetPaste: { _ in },
             loadHistoryIDs: { throw TestFailure.loadFailed },
             reportLoadFailure: { _ in reportCount += 1 },
             presentPanel: { _ in presentationCount += 1 }
@@ -203,6 +208,7 @@ final class ViewerPanelControllerTests: XCTestCase {
             modelContainer: fixture.container,
             viewerState: state,
             onClearHistory: {},
+            onSnippetPaste: { _ in },
             loadHistoryIDs: {
                 loadCount += 1
                 if loadCount == 1 {
@@ -247,6 +253,7 @@ final class ViewerPanelControllerTests: XCTestCase {
             modelContainer: container,
             viewerState: state,
             onClearHistory: {},
+            onSnippetPaste: { _ in },
             reportLoadFailure: { error in
                 XCTFail("Unexpected load failure: \(error)")
             },
@@ -262,6 +269,53 @@ final class ViewerPanelControllerTests: XCTestCase {
         XCTAssertEqual(itemIDsAtPresentation, expectedIDs)
         XCTAssertEqual(state.historyItemIDs, expectedIDs)
         XCTAssertEqual(state.selectedHistoryID, expectedIDs.first)
+    }
+}
+
+extension ViewerPanelControllerTests {
+    func testShow_forwardsSelectedSnippetPasteFromMountedView() async throws {
+        let container = try makeIsolatedContainer()
+        let context = container.mainContext
+        let folder = SnippetFolder(title: "Folder", sortOrder: 0)
+        let snippet = Snippet(
+            title: "Greeting",
+            content: "hello",
+            sortOrder: 0,
+            folder: folder
+        )
+        context.insert(folder)
+        context.insert(snippet)
+        try context.save()
+
+        let state = ViewerState()
+        state.selectedTab = .snippets
+        let pasteExpectation = expectation(description: "controller forwarded snippet paste")
+        var pastedIDs: [PersistentIdentifier] = []
+        let controller = retain(ViewerPanelController(
+            modelContainer: container,
+            viewerState: state,
+            onClearHistory: {},
+            onSnippetPaste: { pastedSnippet in
+                pastedIDs.append(pastedSnippet.persistentModelID)
+                pasteExpectation.fulfill()
+            },
+            loadHistoryIDs: { [] },
+            reportLoadFailure: { error in
+                XCTFail("Unexpected load failure: \(error)")
+            },
+            presentPanel: { panel in
+                self.retain(panel)
+                panel.contentView?.layoutSubtreeIfNeeded()
+            }
+        ))
+
+        XCTAssertTrue(controller.show())
+        try await waitForSnippetIDs([snippet.persistentModelID], in: state)
+
+        state.perform(.paste(.original))
+
+        await fulfillment(of: [pasteExpectation], timeout: 1.0)
+        XCTAssertEqual(pastedIDs, [snippet.persistentModelID])
     }
 }
 
@@ -293,6 +347,25 @@ private extension ViewerPanelControllerTests {
 
     private func makeContainer() throws -> ModelContainer {
         try Self.containerResult.get()
+    }
+
+    private func makeIsolatedContainer() throws -> ModelContainer {
+        let schema = YankSchema.current
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func waitForSnippetIDs(
+        _ expectedIDs: [PersistentIdentifier],
+        in state: ViewerState
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(1)
+        while state.snippetIDs != expectedIDs, clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(state.snippetIDs, expectedIDs)
+        XCTAssertEqual(state.selectedSnippetID, expectedIDs.first)
     }
 
     func resetSharedContainer() throws {

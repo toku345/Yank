@@ -3,6 +3,8 @@ import Carbon.HIToolbox
 import os.log
 
 enum PasteService {
+    typealias PasteboardItemFactory = () -> NSPasteboardItem
+
     private static let logger = Logger(subsystem: "com.toku345.Yank", category: "PasteService")
 
     @discardableResult
@@ -40,7 +42,11 @@ enum PasteService {
     }
 
     @discardableResult
-    static func writePlainTextToPasteboard(item: ClipItem, pasteboard: NSPasteboard = .general) -> Bool {
+    static func writePlainTextToPasteboard(
+        item: ClipItem,
+        pasteboard: NSPasteboard = .general,
+        makePasteboardItem: PasteboardItemFactory = { NSPasteboardItem() }
+    ) -> Bool {
         // Derive text BEFORE touching the pasteboard so a validation failure
         // leaves the user's existing clipboard intact.
         guard let textValue = derivePlainText(from: item) else {
@@ -51,31 +57,45 @@ enum PasteService {
         return writePlainText(
             textValue,
             sourceTitle: item.title,
-            pasteboard: pasteboard
+            pasteboard: pasteboard,
+            makePasteboardItem: makePasteboardItem
         )
     }
 
     @discardableResult
     static func writeSnippetToPasteboard(
         snippet: Snippet,
-        pasteboard: NSPasteboard = .general
+        pasteboard: NSPasteboard = .general,
+        makePasteboardItem: PasteboardItemFactory = { NSPasteboardItem() }
     ) -> Bool {
         writePlainText(
             snippet.content,
             sourceTitle: snippet.title,
-            pasteboard: pasteboard
+            pasteboard: pasteboard,
+            makePasteboardItem: makePasteboardItem
         )
     }
 
     private static func writePlainText(
         _ text: String,
         sourceTitle: String,
-        pasteboard: NSPasteboard
+        pasteboard: NSPasteboard,
+        makePasteboardItem: PasteboardItemFactory
     ) -> Bool {
-        let pbItem = NSPasteboardItem()
-        pbItem.setString(text, forType: .string)
+        let pbItem = makePasteboardItem()
+        guard pbItem.setString(text, forType: .string) else {
+            logger.error(
+                "Failed to create plain-text pasteboard item for: \(sourceTitle, privacy: .private)"
+            )
+            return false
+        }
         // Self-paste suppression marker (ADR 0002)
-        pbItem.setString("", forType: .fromYank)
+        guard pbItem.setString("", forType: .fromYank) else {
+            logger.error(
+                "Failed to add self-paste marker for: \(sourceTitle, privacy: .private)"
+            )
+            return false
+        }
 
         guard writePreservingOnFailure([pbItem], to: pasteboard) else {
             logger.error("Plain-text pasteboard write failed; restored snapshot for: \(sourceTitle, privacy: .private)")
