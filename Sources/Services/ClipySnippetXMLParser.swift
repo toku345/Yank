@@ -15,6 +15,7 @@ enum ClipySnippetXMLParserError: LocalizedError, Equatable {
     case unexpectedRoot
     case unexpectedElement(path: String)
     case unexpectedText(path: String)
+    case unsupportedEntity(name: String)
     case duplicateElement(path: String)
 
     var errorDescription: String? {
@@ -27,6 +28,8 @@ enum ClipySnippetXMLParserError: LocalizedError, Equatable {
             "Unexpected element at \(path)."
         case .unexpectedText(let path):
             "Unexpected text at \(path)."
+        case .unsupportedEntity(let name):
+            "Unsupported XML entity &\(name);."
         case .duplicateElement(let path):
             "Duplicate element at \(path)."
         }
@@ -38,6 +41,9 @@ enum ClipySnippetXMLParser {
         let handler = Handler()
         let parser = XMLParser(data: data)
         parser.shouldProcessNamespaces = false
+        // Enable declaration callbacks while forbidding external resource resolution.
+        parser.externalEntityResolvingPolicy = .never
+        parser.shouldResolveExternalEntities = true
         parser.delegate = handler
         guard parser.parse() else {
             throw handler.parserError ?? ClipySnippetXMLParserError.invalidXML
@@ -159,6 +165,26 @@ private final class Handler: NSObject, XMLParserDelegate {
             return
         }
         appendText(text, parser: parser)
+    }
+
+    func parser(_ parser: XMLParser, foundSkippedEntityName name: String) {
+        guard parserError == nil else { return }
+        fail(.unsupportedEntity(name: name), parser: parser)
+    }
+
+    func parser(_ parser: XMLParser, foundInternalEntityDeclarationWithName name: String, value: String?) {
+        guard parserError == nil else { return }
+        fail(.unsupportedEntity(name: name), parser: parser)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        foundExternalEntityDeclarationWithName name: String,
+        publicID: String?,
+        systemID: String?
+    ) {
+        guard parserError == nil else { return }
+        fail(.unsupportedEntity(name: name), parser: parser)
     }
 
     func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {

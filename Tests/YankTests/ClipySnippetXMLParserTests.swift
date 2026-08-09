@@ -138,6 +138,28 @@ final class ClipySnippetXMLParserTests: XCTestCase {
         )
     }
 
+    func testRejectsDeclaredEntitiesInsteadOfDroppingContent() {
+        let declarations = [
+            "<!ENTITY value \"missing\">",
+            "<!ENTITY value SYSTEM \"file:///missing-yank-clipy-entity.txt\">"
+        ]
+        for declaration in declarations {
+            assertParseFails(
+                """
+                <!DOCTYPE folders [\(declaration)]>
+                <folders>
+                  <folder>
+                    <snippets>
+                      <snippet><content>before &value; after</content></snippet>
+                    </snippets>
+                  </folder>
+                </folders>
+                """,
+                expected: .unsupportedEntity(name: "value")
+            )
+        }
+    }
+
     func testRejectsDuplicateFolderTitle() {
         assertParseFails(
             """
@@ -186,6 +208,10 @@ final class ClipySnippetXMLParserTests: XCTestCase {
         XCTAssertEqual(
             ClipySnippetXMLParserError.unexpectedText(path: "folders/folder").errorDescription,
             "Unexpected text at folders/folder."
+        )
+        XCTAssertEqual(
+            ClipySnippetXMLParserError.unsupportedEntity(name: "value").errorDescription,
+            "Unsupported XML entity &value;."
         )
         XCTAssertEqual(
             ClipySnippetXMLParserError.duplicateElement(path: "folders/folder/title").errorDescription,
