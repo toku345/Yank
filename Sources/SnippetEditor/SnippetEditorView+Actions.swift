@@ -24,14 +24,13 @@ extension SnippetEditorView {
     }
 
     func beginImportClipyXML() {
-        requestTransition {
-            SnippetEditorWindowController.performClipyXMLImport(
-                using: xmlFilePicker,
-                state: state,
-                context: modelContext,
-                errorReporter: errorReporter
-            )
-        }
+        SnippetEditorWindowController.performClipyXMLImport(
+            using: xmlFilePicker,
+            prepareForImport: { requestTransition {} },
+            state: state,
+            context: modelContext,
+            errorReporter: errorReporter
+        )
     }
 
     func beginRenameSelectedFolder() {

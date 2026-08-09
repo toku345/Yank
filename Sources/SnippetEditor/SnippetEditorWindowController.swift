@@ -19,6 +19,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
     typealias DeleteConfirmation = @MainActor (_ title: String, _ message: String) -> Bool
     typealias ErrorReporter = @MainActor (_ operation: String, _ error: Error) -> Void
     typealias XMLFilePicker = @MainActor () -> URL?
+    typealias ImportPreparation = @MainActor () -> Bool
     typealias WindowFactory = @MainActor (_ contentView: NSView) -> NSWindow
     typealias WindowPresenter = @MainActor (_ window: NSWindow) -> Void
 
@@ -190,11 +191,13 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
     @discardableResult
     static func performClipyXMLImport(
         using xmlFilePicker: XMLFilePicker,
+        prepareForImport: ImportPreparation = { true },
         state: SnippetEditorState,
         context: ModelContext,
         errorReporter: ErrorReporter
     ) -> Bool {
         guard let url = xmlFilePicker() else { return false }
+        guard prepareForImport() else { return false }
         do {
             try importClipyXML(from: url, state: state, context: context)
             return true

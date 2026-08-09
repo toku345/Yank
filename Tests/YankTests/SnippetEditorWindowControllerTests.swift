@@ -134,13 +134,16 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
         XCTAssertEqual(state.selectedSnippetID, snippets[0].persistentModelID)
     }
 
-    func testPerformClipyXMLImportCancellationIsNoOp() throws {
+    func testPerformClipyXMLImportCancellationDoesNotPrepareOrDiscardDirtyDraft() throws {
         let fixture = try makeSnippetFixture()
+        let context = fixture.container.mainContext
         let state = SnippetEditorState()
         state.selectSnippet(fixture.snippet)
+        state.draft?.content = "Changed"
         let selectedFolderID = state.selectedFolderID
         let selectedSnippetID = state.selectedSnippetID
         var pickerCount = 0
+        var preparationCount = 0
         var reportedError = false
 
         XCTAssertFalse(SnippetEditorWindowController.performClipyXMLImport(
@@ -148,19 +151,26 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
                 pickerCount += 1
                 return nil
             },
+            prepareForImport: {
+                preparationCount += 1
+                return (try? state.resolveDirtyDraft(
+                    decisionProvider: { .discard },
+                    in: context
+                )) ?? false
+            },
             state: state,
-            context: fixture.container.mainContext,
+            context: context,
             errorReporter: { _, _ in reportedError = true }
         ))
 
         XCTAssertEqual(pickerCount, 1)
+        XCTAssertEqual(preparationCount, 0)
         XCTAssertFalse(reportedError)
+        XCTAssertEqual(state.draft?.content, "Changed")
+        XCTAssertTrue(state.hasDirtyDraft)
         XCTAssertEqual(state.selectedFolderID, selectedFolderID)
         XCTAssertEqual(state.selectedSnippetID, selectedSnippetID)
-        XCTAssertEqual(
-            try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count,
-            1
-        )
+        XCTAssertEqual(try context.fetch(FetchDescriptor<SnippetFolder>()).count, 1)
     }
 
     func testPerformClipyXMLImportReadFailureReportsUnderlyingErrorAndPreservesState() throws {
@@ -192,10 +202,7 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
         XCTAssertEqual(underlyingError.code, NSFileReadNoSuchFileError)
         XCTAssertEqual(state.selectedFolderID, selectedFolderID)
         XCTAssertEqual(state.selectedSnippetID, selectedSnippetID)
-        XCTAssertEqual(
-            try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count,
-            1
-        )
+        XCTAssertEqual(try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count, 1)
     }
 
     func testImportClipyXMLInvalidLeavesExistingDataUnchanged() throws {
@@ -251,10 +258,7 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
 
         XCTAssertEqual(state.selectedFolderID, selectedFolderID)
         XCTAssertEqual(state.selectedSnippetID, selectedSnippetID)
-        XCTAssertEqual(
-            try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count,
-            1
-        )
+        XCTAssertEqual(try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count, 1)
     }
 
     private func makeContainer() throws -> ModelContainer {
