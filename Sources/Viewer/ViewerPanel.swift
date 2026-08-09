@@ -10,6 +10,9 @@ final class ViewerPanel: NSPanel {
     /// NSEvent.modifierFlags on keyDown carries stale state from prior
     /// key combos (Cmd+Shift+V hotkey, viewer keyboard shortcuts).
     private var trackedModifiers: NSEvent.ModifierFlags = []
+    private static let shortcutModifierMask: NSEvent.ModifierFlags = [
+        .command, .control, .option, .shift
+    ]
 
     init(
         viewerState: ViewerState,
@@ -52,6 +55,22 @@ final class ViewerPanel: NSPanel {
             return
         }
         super.sendEvent(event)
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Focused SwiftUI controls receive key equivalents before sendEvent.
+        // Consume Ctrl+Return here so TabView tabs cannot open their menu.
+        let shortcutModifiers = trackedModifiers.intersection(
+            Self.shortcutModifierMask
+        )
+        guard event.type == .keyDown,
+              event.keyCode == 36,
+              shortcutModifiers == .control else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        return handleViewerKeyDown(event)
+            || super.performKeyEquivalent(with: event)
     }
 
     @discardableResult

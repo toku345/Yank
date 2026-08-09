@@ -233,3 +233,39 @@ final class ViewerPanelTests: XCTestCase {
         )
     }
 }
+
+@MainActor
+final class ViewerPanelKeyEquivalentTests: XCTestCase {
+    func testControlReturnDispatchesPlainTextPaste() throws {
+        let state = ViewerState()
+        let panel = ViewerPanel(viewerState: state, contentView: NSView())
+        panel.sendEvent(try makeEvent(type: .flagsChanged, keyCode: 59))
+
+        let handled = panel.performKeyEquivalent(
+            with: try makeEvent(type: .keyDown, keyCode: 36)
+        )
+
+        XCTAssertTrue(handled)
+        XCTAssertEqual(state.pendingAction, .paste(.plainText))
+    }
+
+    private func makeEvent(
+        type: NSEvent.EventType,
+        keyCode: UInt16
+    ) throws -> NSEvent {
+        try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: type,
+                location: .zero,
+                modifierFlags: .control,
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: type == .keyDown ? "\r" : "",
+                charactersIgnoringModifiers: type == .keyDown ? "\r" : "",
+                isARepeat: false,
+                keyCode: keyCode
+            )
+        )
+    }
+}
