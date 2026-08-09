@@ -25,14 +25,12 @@ extension SnippetEditorView {
 
     func beginImportClipyXML() {
         requestTransition {
-            guard let url = xmlFilePicker() else { return }
-            performMutation("import snippets") {
-                try SnippetEditorWindowController.importClipyXML(
-                    from: url,
-                    state: state,
-                    context: modelContext
-                )
-            }
+            SnippetEditorWindowController.performClipyXMLImport(
+                using: xmlFilePicker,
+                state: state,
+                context: modelContext,
+                errorReporter: errorReporter
+            )
         }
     }
 

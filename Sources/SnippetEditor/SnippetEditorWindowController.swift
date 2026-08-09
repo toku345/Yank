@@ -4,6 +4,15 @@ import SwiftUI
 import UniformTypeIdentifiers
 import os.log
 
+struct ClipySnippetFileReadError: LocalizedError {
+    let fileName: String
+    let underlyingError: Error
+
+    var errorDescription: String? {
+        "Could not read “\(fileName)”."
+    }
+}
+
 @MainActor
 final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
     typealias DirtyDraftPrompt = @MainActor () -> DirtyDraftDecision
@@ -156,7 +165,8 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
         logger.error(
             """
             Failed to \(operation, privacy: .public); \
-            errorType=\(String(reflecting: type(of: error)), privacy: .public)
+            errorType=\(String(reflecting: type(of: error)), privacy: .public); \
+            error=\(String(describing: error), privacy: .public)
             """
         )
         let alert = NSAlert()
@@ -177,6 +187,23 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
         return panel.url
     }
 
+    @discardableResult
+    static func performClipyXMLImport(
+        using xmlFilePicker: XMLFilePicker,
+        state: SnippetEditorState,
+        context: ModelContext,
+        errorReporter: ErrorReporter
+    ) -> Bool {
+        guard let url = xmlFilePicker() else { return false }
+        do {
+            try importClipyXML(from: url, state: state, context: context)
+            return true
+        } catch {
+            errorReporter("import snippets", error)
+            return false
+        }
+    }
+
     static func importClipyXML(
         from url: URL,
         state: SnippetEditorState,
@@ -187,7 +214,10 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
         do {
             data = try Data(contentsOf: url)
         } catch {
-            throw ClipySnippetXMLParserError.readFailed
+            throw ClipySnippetFileReadError(
+                fileName: url.lastPathComponent,
+                underlyingError: error
+            )
         }
         let imported = try ClipySnippetXMLParser.parse(data: data)
         let result = try SnippetMutations.importClipyFolders(
@@ -196,7 +226,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
             saveChanges: saveChanges
         )
         if !imported.isEmpty {
-            try state.apply(result, in: context)
+            state.apply(result)
         }
     }
 }

@@ -85,7 +85,7 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
         let snippet: Snippet
     }
 
-    func testImportClipyXMLFromURLUpdatesSelection() throws {
+    func testPerformClipyXMLImportUsesPickerAndUpdatesSelection() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let existing = SnippetFolder(title: "Existing", sortOrder: 0)
@@ -110,13 +110,21 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
             """
         )
         defer { try? FileManager.default.removeItem(at: url) }
+        var pickerCount = 0
 
-        try SnippetEditorWindowController.importClipyXML(
-            from: url,
+        XCTAssertTrue(SnippetEditorWindowController.performClipyXMLImport(
+            using: {
+                pickerCount += 1
+                return url
+            },
             state: state,
-            context: context
-        )
+            context: context,
+            errorReporter: { operation, error in
+                XCTFail("Unexpected \(operation) error: \(error)")
+            }
+        ))
 
+        XCTAssertEqual(pickerCount, 1)
         let folders = try context.fetch(FetchDescriptor<SnippetFolder>())
             .sorted { $0.sortOrder < $1.sortOrder }
         XCTAssertEqual(folders.map(\.title), ["Existing", "Imported"])
@@ -124,6 +132,70 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
         let snippets = SnippetOrdering.snippets(folders[1].snippets)
         XCTAssertEqual(snippets.map(\.title), ["First"])
         XCTAssertEqual(state.selectedSnippetID, snippets[0].persistentModelID)
+    }
+
+    func testPerformClipyXMLImportCancellationIsNoOp() throws {
+        let fixture = try makeSnippetFixture()
+        let state = SnippetEditorState()
+        state.selectSnippet(fixture.snippet)
+        let selectedFolderID = state.selectedFolderID
+        let selectedSnippetID = state.selectedSnippetID
+        var pickerCount = 0
+        var reportedError = false
+
+        XCTAssertFalse(SnippetEditorWindowController.performClipyXMLImport(
+            using: {
+                pickerCount += 1
+                return nil
+            },
+            state: state,
+            context: fixture.container.mainContext,
+            errorReporter: { _, _ in reportedError = true }
+        ))
+
+        XCTAssertEqual(pickerCount, 1)
+        XCTAssertFalse(reportedError)
+        XCTAssertEqual(state.selectedFolderID, selectedFolderID)
+        XCTAssertEqual(state.selectedSnippetID, selectedSnippetID)
+        XCTAssertEqual(
+            try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count,
+            1
+        )
+    }
+
+    func testPerformClipyXMLImportReadFailureReportsUnderlyingErrorAndPreservesState() throws {
+        let fixture = try makeSnippetFixture()
+        let state = SnippetEditorState()
+        state.selectSnippet(fixture.snippet)
+        let selectedFolderID = state.selectedFolderID
+        let selectedSnippetID = state.selectedSnippetID
+        let missingURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("missing-yank-clipy-\(UUID().uuidString).xml")
+        var reportedOperation: String?
+        var reportedError: Error?
+
+        XCTAssertFalse(SnippetEditorWindowController.performClipyXMLImport(
+            using: { missingURL },
+            state: state,
+            context: fixture.container.mainContext,
+            errorReporter: { operation, error in
+                reportedOperation = operation
+                reportedError = error
+            }
+        ))
+
+        XCTAssertEqual(reportedOperation, "import snippets")
+        let readError = try XCTUnwrap(reportedError as? ClipySnippetFileReadError)
+        XCTAssertEqual(readError.fileName, missingURL.lastPathComponent)
+        let underlyingError = readError.underlyingError as NSError
+        XCTAssertEqual(underlyingError.domain, NSCocoaErrorDomain)
+        XCTAssertEqual(underlyingError.code, NSFileReadNoSuchFileError)
+        XCTAssertEqual(state.selectedFolderID, selectedFolderID)
+        XCTAssertEqual(state.selectedSnippetID, selectedSnippetID)
+        XCTAssertEqual(
+            try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count,
+            1
+        )
     }
 
     func testImportClipyXMLInvalidLeavesExistingDataUnchanged() throws {

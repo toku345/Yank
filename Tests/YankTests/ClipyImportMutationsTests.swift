@@ -84,7 +84,8 @@ final class ClipyImportMutationsTests: XCTestCase {
 
         let result = try SnippetMutations.importClipyFolders([], in: context)
 
-        XCTAssertEqual(result, SnippetMutationResult(selectedFolderID: nil, selectedSnippetID: nil))
+        XCTAssertNil(result.selectedFolder)
+        XCTAssertNil(result.selectedSnippet)
         XCTAssertFalse(context.hasChanges)
         XCTAssertEqual(try fetchFolders(from: ModelContext(container)).map(\.title), ["Existing"])
     }

@@ -114,7 +114,7 @@ enum SnippetMutations {
         _ folders: [ClipyImportedFolder],
         in context: ModelContext,
         saveChanges: SaveChanges = { try $0.save() }
-    ) throws -> SnippetMutationResult {
+    ) throws -> ClipyImportMutationResult {
         try requireCleanContext(context)
 
         let normalized = folders.map { folder in
@@ -130,7 +130,7 @@ enum SnippetMutations {
         }
 
         guard !normalized.isEmpty else {
-            return SnippetMutationResult(selectedFolderID: nil, selectedSnippetID: nil)
+            return ClipyImportMutationResult(selectedFolder: nil, selectedSnippet: nil)
         }
 
         let existing = try loadFolders(in: context)
@@ -162,9 +162,9 @@ enum SnippetMutations {
         }
 
         try saveOrRollback(context, saveChanges: saveChanges)
-        return SnippetMutationResult(
-            selectedFolderID: firstFolder?.persistentModelID,
-            selectedSnippetID: firstSnippet?.persistentModelID
+        return ClipyImportMutationResult(
+            selectedFolder: firstFolder,
+            selectedSnippet: firstSnippet
         )
     }
 }
