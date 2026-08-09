@@ -109,6 +109,64 @@ enum SnippetMutations {
             selectedSnippetID: selectedSnippet?.persistentModelID
         )
     }
+
+    static func importClipyFolders(
+        _ folders: [ClipyImportedFolder],
+        in context: ModelContext,
+        saveChanges: SaveChanges = { try $0.save() }
+    ) throws -> ClipyImportMutationResult {
+        try requireCleanContext(context)
+
+        let normalized = folders.map { folder in
+            (
+                title: importTitle(folder.title, fallback: "untitled folder"),
+                snippets: folder.snippets.map { snippet in
+                    (
+                        title: importTitle(snippet.title, fallback: "untitled snippet"),
+                        content: snippet.content
+                    )
+                }
+            )
+        }
+
+        guard !normalized.isEmpty else {
+            return ClipyImportMutationResult(selectedFolder: nil, selectedSnippet: nil)
+        }
+
+        let existing = try loadFolders(in: context)
+        let baseSortOrder = existing.count
+        var firstFolder: SnippetFolder?
+        var firstSnippet: Snippet?
+
+        for (folderIndex, folderData) in normalized.enumerated() {
+            let folder = SnippetFolder(
+                title: folderData.title,
+                sortOrder: baseSortOrder + folderIndex
+            )
+            context.insert(folder)
+            if folderIndex == 0 {
+                firstFolder = folder
+            }
+            for (snippetIndex, snippetData) in folderData.snippets.enumerated() {
+                let snippet = Snippet(
+                    title: snippetData.title,
+                    content: snippetData.content,
+                    sortOrder: snippetIndex,
+                    folder: folder
+                )
+                context.insert(snippet)
+                if folderIndex == 0 && snippetIndex == 0 {
+                    firstSnippet = snippet
+                }
+            }
+        }
+
+        try saveOrRollback(context, saveChanges: saveChanges)
+        return ClipyImportMutationResult(
+            selectedFolder: firstFolder,
+            selectedSnippet: firstSnippet
+        )
+    }
 }
 
 extension SnippetMutations {
@@ -273,6 +331,11 @@ extension SnippetMutations {
 }
 
 private extension SnippetMutations {
+    private static func importTitle(_ title: String, fallback: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
+    }
+
     private static func requireCleanContext(_ context: ModelContext) throws {
         guard !context.hasChanges else {
             throw SnippetEditorMutationError.contextHasPendingChanges
