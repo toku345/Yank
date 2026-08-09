@@ -14,8 +14,8 @@ enum ClipySnippetXMLParserError: LocalizedError, Equatable {
     case invalidXML
     case unexpectedRoot
     case unexpectedElement(path: String)
+    case unexpectedText(path: String)
     case duplicateElement(path: String)
-    case readFailed
 
     var errorDescription: String? {
         switch self {
@@ -25,10 +25,10 @@ enum ClipySnippetXMLParserError: LocalizedError, Equatable {
             "The XML root element must be <folders>."
         case .unexpectedElement(let path):
             "Unexpected element at \(path)."
+        case .unexpectedText(let path):
+            "Unexpected text at \(path)."
         case .duplicateElement(let path):
             "Duplicate element at \(path)."
-        case .readFailed:
-            "Could not read the selected file."
         }
     }
 }
@@ -149,7 +149,7 @@ private final class Handler: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
         guard parserError == nil else { return }
-        appendText(string)
+        appendText(string, parser: parser)
     }
 
     func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
@@ -158,7 +158,7 @@ private final class Handler: NSObject, XMLParserDelegate {
             fail(.invalidXML, parser: parser)
             return
         }
-        appendText(text)
+        appendText(text, parser: parser)
     }
 
     func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
@@ -319,12 +319,34 @@ private extension Handler {
         }
     }
 
-    private func appendText(_ string: String) {
+    private func appendText(_ string: String, parser: XMLParser) {
         switch state {
         case .inFolderTitle, .inSnippetTitle, .inSnippetContent:
             textBuffer += string
         default:
-            break
+            guard !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            fail(.unexpectedText(path: currentPath), parser: parser)
+        }
+    }
+
+    private var currentPath: String {
+        switch state {
+        case .awaitingRoot, .finished:
+            "/"
+        case .inFolders:
+            "folders"
+        case .inFolder:
+            "folders/folder"
+        case .inFolderTitle:
+            "folders/folder/title"
+        case .inSnippets:
+            "folders/folder/snippets"
+        case .inSnippet:
+            "folders/folder/snippets/snippet"
+        case .inSnippetTitle:
+            "folders/folder/snippets/snippet/title"
+        case .inSnippetContent:
+            "folders/folder/snippets/snippet/content"
         }
     }
 

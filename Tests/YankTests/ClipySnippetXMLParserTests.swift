@@ -91,6 +91,24 @@ final class ClipySnippetXMLParserTests: XCTestCase {
         XCTAssertEqual(folders[1].snippets, [])
     }
 
+    func testParsesCDATAAndEscapedEntitiesInContent() throws {
+        let xml = """
+        <folders>
+          <folder>
+            <snippets>
+              <snippet>
+                <content><![CDATA[if a < b && c > d]]>&amp; done</content>
+              </snippet>
+            </snippets>
+          </folder>
+        </folders>
+        """
+
+        let folders = try ClipySnippetXMLParser.parse(data: Data(xml.utf8))
+
+        XCTAssertEqual(folders[0].snippets[0].content, "if a < b && c > d& done")
+    }
+
     func testRejectsMalformedXML() {
         assertParseFails("<folders><folder>", expected: .invalidXML)
     }
@@ -110,6 +128,13 @@ final class ClipySnippetXMLParserTests: XCTestCase {
         assertParseFails(
             "<folders><folder><index>0</index></folder></folders>",
             expected: .unexpectedElement(path: "folders/folder/index")
+        )
+    }
+
+    func testRejectsNonWhitespaceTextOutsideValueElements() {
+        assertParseFails(
+            "<folders><folder><snippets><snippet><title>A</title>lost body</snippet></snippets></folder></folders>",
+            expected: .unexpectedText(path: "folders/folder/snippets/snippet")
         )
     }
 
@@ -159,12 +184,12 @@ final class ClipySnippetXMLParserTests: XCTestCase {
             "Unexpected element at folders/x."
         )
         XCTAssertEqual(
-            ClipySnippetXMLParserError.duplicateElement(path: "folders/folder/title").errorDescription,
-            "Duplicate element at folders/folder/title."
+            ClipySnippetXMLParserError.unexpectedText(path: "folders/folder").errorDescription,
+            "Unexpected text at folders/folder."
         )
         XCTAssertEqual(
-            ClipySnippetXMLParserError.readFailed.errorDescription,
-            "Could not read the selected file."
+            ClipySnippetXMLParserError.duplicateElement(path: "folders/folder/title").errorDescription,
+            "Duplicate element at folders/folder/title."
         )
     }
 
