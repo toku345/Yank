@@ -85,6 +85,106 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
         let snippet: Snippet
     }
 
+    func testImportClipyXMLFromURLUpdatesSelection() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let existing = SnippetFolder(title: "Existing", sortOrder: 0)
+        context.insert(existing)
+        try context.save()
+
+        let state = SnippetEditorState()
+        state.selectFolder(existing)
+        let url = try writeTempXML(
+            """
+            <folders>
+              <folder>
+                <title>Imported</title>
+                <snippets>
+                  <snippet>
+                    <title>First</title>
+                    <content>hello</content>
+                  </snippet>
+                </snippets>
+              </folder>
+            </folders>
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try SnippetEditorWindowController.importClipyXML(
+            from: url,
+            state: state,
+            context: context
+        )
+
+        let folders = try context.fetch(FetchDescriptor<SnippetFolder>())
+            .sorted { $0.sortOrder < $1.sortOrder }
+        XCTAssertEqual(folders.map(\.title), ["Existing", "Imported"])
+        XCTAssertEqual(state.selectedFolderID, folders[1].persistentModelID)
+        let snippets = SnippetOrdering.snippets(folders[1].snippets)
+        XCTAssertEqual(snippets.map(\.title), ["First"])
+        XCTAssertEqual(state.selectedSnippetID, snippets[0].persistentModelID)
+    }
+
+    func testImportClipyXMLInvalidLeavesExistingDataUnchanged() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let existing = SnippetFolder(title: "Existing", sortOrder: 0)
+        let snippet = Snippet(title: "Keep", content: "body", sortOrder: 0, folder: existing)
+        context.insert(existing)
+        context.insert(snippet)
+        try context.save()
+
+        let state = SnippetEditorState()
+        state.selectSnippet(snippet)
+        let selectedFolderID = state.selectedFolderID
+        let selectedSnippetID = state.selectedSnippetID
+
+        let url = try writeTempXML("<folders><folder><index>1</index></folder></folders>")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertThrowsError(try SnippetEditorWindowController.importClipyXML(
+            from: url,
+            state: state,
+            context: context
+        )) { error in
+            XCTAssertEqual(
+                error as? ClipySnippetXMLParserError,
+                .unexpectedElement(path: "folders/folder/index")
+            )
+        }
+
+        XCTAssertFalse(context.hasChanges)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<SnippetFolder>()).map(\.title), ["Existing"])
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Snippet>()).map(\.title), ["Keep"])
+        XCTAssertEqual(state.selectedFolderID, selectedFolderID)
+        XCTAssertEqual(state.selectedSnippetID, selectedSnippetID)
+    }
+
+    func testImportClipyXMLEmptyFileKeepsSelection() throws {
+        let fixture = try makeSnippetFixture()
+        let state = SnippetEditorState()
+        state.selectSnippet(fixture.snippet)
+        let selectedFolderID = state.selectedFolderID
+        let selectedSnippetID = state.selectedSnippetID
+
+        let url = try writeTempXML("<folders/>")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try SnippetEditorWindowController.importClipyXML(
+            from: url,
+            state: state,
+            context: fixture.container.mainContext
+        )
+
+        XCTAssertEqual(state.selectedFolderID, selectedFolderID)
+        XCTAssertEqual(state.selectedSnippetID, selectedSnippetID)
+        XCTAssertEqual(
+            try fixture.container.mainContext.fetch(FetchDescriptor<SnippetFolder>()).count,
+            1
+        )
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = YankSchema.current
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -100,5 +200,12 @@ final class SnippetEditorWindowControllerTests: XCTestCase {
         context.insert(snippet)
         try context.save()
         return SnippetFixture(container: container, snippet: snippet)
+    }
+
+    private func writeTempXML(_ contents: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("yank-clipy-import-\(UUID().uuidString).xml")
+        try Data(contents.utf8).write(to: url)
+        return url
     }
 }

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 import os.log
 
 @MainActor
@@ -8,6 +9,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
     typealias DirtyDraftPrompt = @MainActor () -> DirtyDraftDecision
     typealias DeleteConfirmation = @MainActor (_ title: String, _ message: String) -> Bool
     typealias ErrorReporter = @MainActor (_ operation: String, _ error: Error) -> Void
+    typealias XMLFilePicker = @MainActor () -> URL?
     typealias WindowFactory = @MainActor (_ contentView: NSView) -> NSWindow
     typealias WindowPresenter = @MainActor (_ window: NSWindow) -> Void
 
@@ -22,6 +24,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
     private let dirtyDraftPrompt: DirtyDraftPrompt
     private let deleteConfirmation: DeleteConfirmation
     private let errorReporter: ErrorReporter
+    private let xmlFilePicker: XMLFilePicker
     private let windowFactory: WindowFactory
     private let windowPresenter: WindowPresenter
 
@@ -33,6 +36,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
         dirtyDraftPrompt: DirtyDraftPrompt? = nil,
         deleteConfirmation: DeleteConfirmation? = nil,
         errorReporter: ErrorReporter? = nil,
+        xmlFilePicker: XMLFilePicker? = nil,
         windowFactory: WindowFactory? = nil,
         windowPresenter: WindowPresenter? = nil
     ) {
@@ -41,6 +45,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
         self.dirtyDraftPrompt = dirtyDraftPrompt ?? Self.promptForDirtyDraft
         self.deleteConfirmation = deleteConfirmation ?? Self.confirmDeletion
         self.errorReporter = errorReporter ?? Self.reportError
+        self.xmlFilePicker = xmlFilePicker ?? Self.pickXMLFile
         self.windowFactory = windowFactory ?? Self.makeWindow
         self.windowPresenter = windowPresenter ?? Self.presentWindow
     }
@@ -84,6 +89,7 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
             dirtyDraftPrompt: dirtyDraftPrompt,
             deleteConfirmation: deleteConfirmation,
             errorReporter: errorReporter,
+            xmlFilePicker: xmlFilePicker,
             dragRegistry: dragRegistry
         )
         .modelContainer(modelContainer)
@@ -158,5 +164,39 @@ final class SnippetEditorWindowController: NSObject, NSWindowDelegate {
         alert.informativeText = "Your previous snippet data was preserved. \(error.localizedDescription)"
         alert.alertStyle = .warning
         alert.runModal()
+    }
+
+    private static func pickXMLFile() -> URL? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.xml]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.title = "Import Clipy Snippets"
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
+    static func importClipyXML(
+        from url: URL,
+        state: SnippetEditorState,
+        context: ModelContext,
+        saveChanges: SnippetMutations.SaveChanges = { try $0.save() }
+    ) throws {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw ClipySnippetXMLParserError.readFailed
+        }
+        let imported = try ClipySnippetXMLParser.parse(data: data)
+        let result = try SnippetMutations.importClipyFolders(
+            imported,
+            in: context,
+            saveChanges: saveChanges
+        )
+        if !imported.isEmpty {
+            try state.apply(result, in: context)
+        }
     }
 }

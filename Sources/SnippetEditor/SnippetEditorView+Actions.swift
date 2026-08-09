@@ -23,6 +23,19 @@ extension SnippetEditorView {
         }
     }
 
+    func beginImportClipyXML() {
+        requestTransition {
+            guard let url = xmlFilePicker() else { return }
+            performMutation("import snippets") {
+                try SnippetEditorWindowController.importClipyXML(
+                    from: url,
+                    state: state,
+                    context: modelContext
+                )
+            }
+        }
+    }
+
     func beginRenameSelectedFolder() {
         guard let selectedFolder else { return }
         folderSheet = .rename(id: selectedFolder.persistentModelID, title: selectedFolder.title)
