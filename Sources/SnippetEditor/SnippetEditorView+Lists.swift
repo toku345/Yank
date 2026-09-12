@@ -19,6 +19,9 @@ extension SnippetEditorView {
                 Button(action: beginCreateFolder) {
                     Label("New Folder", systemImage: "plus")
                 }
+                Button(action: beginImportClipyXML) {
+                    Label("Import…", systemImage: "square.and.arrow.down")
+                }
                 Spacer()
                 Button(action: beginRenameSelectedFolder) {
                     Label("Rename", systemImage: "pencil")
