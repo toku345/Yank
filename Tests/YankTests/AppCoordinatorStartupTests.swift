@@ -9,15 +9,8 @@ final class AppCoordinatorStartupTests: XCTestCase {
     }
 
     func testContainerFailurePresentsErrorThenTerminatesWithoutStartingServices() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("YankStartupTests-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let names = ["Yank.store", "Yank.store-wal", "Yank.store-shm", "Yank.store-journal"]
-        for name in names {
-            try Data("preserve \(name)".utf8).write(to: directory.appendingPathComponent(name))
-        }
-
+        // The injected error tests coordinator control flow and alert content.
+        // It does not exercise SwiftData migration or prove on-disk store preservation.
         var events: [String] = []
         var presentedAlert: NSAlert?
         let coordinator = AppCoordinator(
@@ -48,13 +41,6 @@ final class AppCoordinatorStartupTests: XCTestCase {
         XCTAssertTrue(alert.informativeText.contains("left the existing store intact"))
         XCTAssertTrue(alert.informativeText.contains("without deleting or recreating it"))
         XCTAssertEqual(alert.buttons.map(\.title), ["Quit"])
-        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: directory.path)), Set(names))
-        for name in names {
-            XCTAssertEqual(
-                try Data(contentsOf: directory.appendingPathComponent(name)),
-                Data("preserve \(name)".utf8)
-            )
-        }
     }
 
     func testXCTestHostSkipsCoordinatorStartup() throws {
