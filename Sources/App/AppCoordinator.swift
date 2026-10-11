@@ -5,6 +5,9 @@ import os.log
 @MainActor
 final class AppCoordinator {
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "AppCoordinator")
+    private let createModelContainer: () throws -> ModelContainer
+    private let presentStoreError: (NSAlert) -> Void
+    private let terminate: () -> Void
 
     private(set) var modelContainer: ModelContainer?
     private(set) var clipboardHistoryWriter: ClipboardHistoryWriter?
@@ -13,21 +16,29 @@ final class AppCoordinator {
     private(set) var panelController: ViewerPanelController?
     private(set) var snippetEditorWindowController: SnippetEditorWindowController?
 
+    init(
+        createModelContainer: @escaping () throws -> ModelContainer = AppCoordinator.createPersistentContainer,
+        presentStoreError: @escaping (NSAlert) -> Void = { $0.runModal() },
+        terminate: @escaping () -> Void = { NSApplication.shared.terminate(nil) }
+    ) {
+        self.createModelContainer = createModelContainer
+        self.presentStoreError = presentStoreError
+        self.terminate = terminate
+    }
+
     func start() {
-        checkAccessibility()
-
-        let schema = YankSchema.current
-        let config = ModelConfiguration("Yank", schema: schema)
-
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: schema, configurations: [config])
+            container = try createModelContainer()
         } catch {
             logger.error("Failed to create ModelContainer: \(error)")
-            fatalError("Failed to create ModelContainer: \(error)")
+            presentStoreError(Self.makeStoreErrorAlert())
+            terminate()
+            return
         }
         modelContainer = container
         hardenStoreFamily()
+        checkAccessibility()
 
         let writer = ClipboardHistoryWriter(modelContainer: container)
         clipboardHistoryWriter = writer
@@ -161,6 +172,26 @@ final class AppCoordinator {
                 """
             )
         }
+    }
+
+    private static func createPersistentContainer() throws -> ModelContainer {
+        let schema = YankSchema.current
+        let config = ModelConfiguration("Yank", schema: schema)
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private static func makeStoreErrorAlert() -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = "Yank could not open its data store"
+        alert.informativeText = """
+            The clipboard history and snippet store could not be opened. \
+            A data migration may have failed. \
+            Yank has left the existing store intact and will quit without deleting or recreating it. \
+            Keep the store files and report this problem before trying to recover your data.
+            """
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: "Quit")
+        return alert
     }
 
     private func showAccessibilityError() {
