@@ -28,6 +28,7 @@ struct SnippetEditorView: View {
     let dirtyDraftPrompt: SnippetEditorWindowController.DirtyDraftPrompt
     let deleteConfirmation: SnippetEditorWindowController.DeleteConfirmation
     let errorReporter: SnippetEditorWindowController.ErrorReporter
+    let xmlFilePicker: SnippetEditorWindowController.XMLFilePicker
     let dragRegistry: SnippetEditorDragRegistry
 
     var body: some View {
