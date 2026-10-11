@@ -4,7 +4,14 @@ import os.log
 
 @MainActor
 final class AppCoordinator {
+    typealias ModelContainerFactory = @MainActor (Schema, ModelConfiguration) throws -> ModelContainer
+    typealias StartupFailurePresenter = @MainActor (StartupFailureAlert) -> Void
+
     private let logger = Logger(subsystem: "com.toku345.Yank", category: "AppCoordinator")
+
+    private let storeURL: URL?
+    private let makeModelContainer: ModelContainerFactory
+    private let presentStartupFailure: StartupFailurePresenter
 
     private(set) var modelContainer: ModelContainer?
     private(set) var clipboardHistoryWriter: ClipboardHistoryWriter?
@@ -13,21 +20,56 @@ final class AppCoordinator {
     private(set) var panelController: ViewerPanelController?
     private(set) var snippetEditorWindowController: SnippetEditorWindowController?
 
-    func start() {
-        checkAccessibility()
+    /// - Parameters:
+    ///   - storeURL: Overrides the default store location. Production uses
+    ///     `nil`; tests point at a temporary store so failure paths never touch
+    ///     the user's `Yank.store`.
+    ///   - makeModelContainer: Store-opening seam, defaulting to `openStore`.
+    ///   - presentStartupFailure: Failure-reporting seam, defaulting to the
+    ///     alert-and-quit handler.
+    init(
+        storeURL: URL? = nil,
+        makeModelContainer: @escaping ModelContainerFactory = AppCoordinator.openStore,
+        presentStartupFailure: @escaping StartupFailurePresenter = AppCoordinator.presentStartupFailureAndQuit
+    ) {
+        self.storeURL = storeURL
+        self.makeModelContainer = makeModelContainer
+        self.presentStartupFailure = presentStartupFailure
+    }
 
+    /// The production store-opening call, also the default for the injected
+    /// factory so tests can drive a real open failure against a temporary store.
+    static func openStore(schema: Schema, configuration: ModelConfiguration) throws -> ModelContainer {
+        try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    /// Informs the user and stops. Every Yank feature needs the store, so
+    /// staying up would leave a menu bar app that silently does nothing; this
+    /// keeps the fail-stop behavior of the previous `fatalError` while giving
+    /// the user a readable reason and a guarantee that their data is intact.
+    static func presentStartupFailureAndQuit(_ alert: StartupFailureAlert) {
+        alert.present()
+        NSApplication.shared.terminate(nil)
+    }
+
+    func start() {
         let schema = YankSchema.current
-        let config = ModelConfiguration("Yank", schema: schema)
+        let configuration = makeModelConfiguration(schema: schema)
 
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: schema, configurations: [config])
+            container = try makeModelContainer(schema, configuration)
         } catch {
-            logger.error("Failed to create ModelContainer: \(error)")
-            fatalError("Failed to create ModelContainer: \(error)")
+            logger.error("Failed to open the clipboard history store: \(error)")
+            presentStartupFailure(StartupFailureAlert(error: error, storeURL: configuration.url))
+            return
         }
         modelContainer = container
         hardenStoreFamily()
+
+        // Ask for Accessibility only once the store is open: a startup failure
+        // must not request permissions for an app that cannot run.
+        checkAccessibility()
 
         let writer = ClipboardHistoryWriter(modelContainer: container)
         clipboardHistoryWriter = writer
@@ -71,6 +113,13 @@ final class AppCoordinator {
         hotKeyManager = hotKey
 
         logger.info("Yank initialized successfully")
+    }
+
+    private func makeModelConfiguration(schema: Schema) -> ModelConfiguration {
+        guard let storeURL else {
+            return ModelConfiguration("Yank", schema: schema)
+        }
+        return ModelConfiguration("Yank", schema: schema, url: storeURL)
     }
 
     func showSnippetEditor() {
