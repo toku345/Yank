@@ -28,6 +28,17 @@ verifies the result, atomically replaces `/Applications/Yank.app`, and launches
 the installed application. The first Debug-to-installed transition may require
 granting Accessibility access again.
 
+The version comparison and downgrade guard can be tested without building,
+installing, or launching an app:
+
+```bash
+bash Tests/Shell/install-version-tests.sh
+```
+
+This sources only `scripts/lib/install-version.sh`, a helper containing function
+definitions with no installation side effects. CI and `scripts/check.sh` also run
+these tests.
+
 ## Public Release Prerequisites
 
 Public distribution outside the Mac App Store requires membership in the Apple
