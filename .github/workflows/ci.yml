@@ -36,7 +36,10 @@ jobs:
         run: swiftlint lint --strict
 
       - name: Lint shell scripts
-        run: shellcheck scripts/*.sh
+        run: shellcheck -x scripts/*.sh
+
+      - name: Test shell helpers
+        run: scripts/version-guard-test.sh
 
       - name: Generate Xcode project
         run: xcodegen generate
