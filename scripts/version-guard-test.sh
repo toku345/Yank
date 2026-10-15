@@ -58,8 +58,11 @@ done <<'TABLE'
 1.0.0|1|1.0.0|1|ok
 1.0.0|1|1.0.0|2|ok
 1.0.0|2|1.0.0|1|downgrade
+1.0.0|08|1.0.0|9|ok
+1.0.0|010|1.0.0|9|downgrade
 2.0.0|5|1.0.0|99|downgrade
 1.2.3|1|2.0.0|1|ok
+1.0.0|99|1.0.1|1|ok
 0.10.0|1|0.9.0|1|downgrade
 1.0|1|1.0.0|1|invalid-existing-version
 1.0.0.0|1|1.0.0|1|invalid-existing-version
