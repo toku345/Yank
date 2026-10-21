@@ -12,30 +12,6 @@ fail() {
   exit 1
 }
 
-semver_compare() {
-  local left="$1"
-  local right="$2"
-  local -a left_parts=()
-  local -a right_parts=()
-  local index left_number right_number
-
-  IFS=. read -r -a left_parts <<< "${left}"
-  IFS=. read -r -a right_parts <<< "${right}"
-  for index in 0 1 2; do
-    left_number=$((10#${left_parts[${index}]}))
-    right_number=$((10#${right_parts[${index}]}))
-    if ((left_number > right_number)); then
-      echo 1
-      return
-    fi
-    if ((left_number < right_number)); then
-      echo -1
-      return
-    fi
-  done
-  echo 0
-}
-
 verify_existing_app() {
   local app_path="$1"
   local info_plist="${app_path}/Contents/Info.plist"
@@ -49,6 +25,8 @@ verify_existing_app() {
 }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/install-version.sh
+source "${script_dir}/lib/install-version.sh"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 build_root="${YANK_BUILD_ROOT:-${repo_root}/build/production}"
 if [[ "${build_root}" != /* ]]; then
@@ -125,18 +103,8 @@ if [[ -e "${destination_app}" ]]; then
   if [[ "${allow_downgrade}" -eq 0 ]]; then
     existing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${existing_info}")"
     existing_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${existing_info}")"
-    [[ "${existing_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
-      fail "existing app has a non-semantic version; use --allow-downgrade to replace it"
-    [[ "${source_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
-      fail "source app has a non-semantic version"
-    [[ "${existing_build}" =~ ^[0-9]+$ && "${source_build}" =~ ^[0-9]+$ ]] || \
-      fail "app build numbers must be integers"
-
-    version_order="$(semver_compare "${existing_version}" "${source_version}")"
-    if [[ "${version_order}" -gt 0 ]] || \
-      { [[ "${version_order}" -eq 0 ]] && ((10#${existing_build} > 10#${source_build})); }; then
-      fail "refusing to downgrade ${existing_version} (${existing_build}) to ${source_version} (${source_build}); use --allow-downgrade to override"
-    fi
+    check_install_version "${existing_version}" "${existing_build}" \
+      "${source_version}" "${source_build}" || exit 1
   fi
 fi
 

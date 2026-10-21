@@ -13,6 +13,7 @@ if [[ "${missing}" -ne 0 ]]; then
   exit 127
 fi
 
+bash Tests/Shell/install-version-tests.sh
 swiftlint lint --strict
 xcodegen generate
 xcodebuild \
