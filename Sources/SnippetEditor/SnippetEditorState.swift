@@ -29,6 +29,19 @@ struct SnippetDraft: Equatable {
     }
 }
 
+struct ClipyImportMutationResult {
+    let selectedFolder: SnippetFolder?
+    let selectedSnippet: Snippet?
+
+    var selectedFolderID: PersistentIdentifier? {
+        selectedFolder?.persistentModelID
+    }
+
+    var selectedSnippetID: PersistentIdentifier? {
+        selectedSnippet?.persistentModelID
+    }
+}
+
 @Observable
 @MainActor
 final class SnippetEditorState {
@@ -169,6 +182,15 @@ final class SnippetEditorState {
         if let snippetID = result.selectedSnippetID,
            let snippet = try findSnippet(id: snippetID, in: context) {
             selectSnippet(snippet)
+        }
+    }
+
+    func apply(_ result: ClipyImportMutationResult) {
+        guard let folder = result.selectedFolder else { return }
+        if let snippet = result.selectedSnippet {
+            selectSnippet(snippet)
+        } else {
+            selectFolder(folder)
         }
     }
 
